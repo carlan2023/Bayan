@@ -75,8 +75,8 @@ export default function Home() {
             <p>Order now, pay when your parcel reaches your hands. No card required.</p>
           </div>
           <div className="perk">
-            <h3>Free delivery over KES 5,000</h3>
-            <p>Flat KES 250 delivery on smaller orders, anywhere in the country.</p>
+            <h3>Free delivery over UGX 200,000</h3>
+            <p>Flat UGX 10,000 delivery on smaller orders, anywhere in the country.</p>
           </div>
           <div className="perk">
             <h3>30-day returns</h3>

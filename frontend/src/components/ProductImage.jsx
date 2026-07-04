@@ -1,7 +1,10 @@
+import { useState } from "react";
+
 /**
- * Stylised product visual generated from the product's swatch colour.
- * Keeps the MVP fully offline; swap for real photography by replacing
- * this component with an <img> once product images exist.
+ * Renders the product's real photo (product.image) when present, falling back
+ * to a stylised, generated visual derived from the swatch colour if there is no
+ * image or the image fails to load. That fallback keeps the grid clean — no
+ * broken-image icons — even when a seeded URL is unreachable.
  */
 const ICONS = {
   Women: "M50 22c-6 0-10 5-10 11 0 4 2 7 4 9L30 78h40L56 42c2-2 4-5 4-9 0-6-4-11-10-11z",
@@ -18,11 +21,24 @@ function shade(hex, amt) {
 }
 
 export default function ProductImage({ product, ratio = 1.22 }) {
+  const [failed, setFailed] = useState(false);
   const base = product.swatch || "#2e4b3f";
   const light = shade(base, 46);
   const dark = shade(base, -34);
   const icon = ICONS[product.category] || ICONS.Home;
   const gid = `g-${product.id || product.slug}`;
+
+  if (product.image && !failed) {
+    return (
+      <img
+        src={product.image}
+        alt={product.name}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", aspectRatio: `1 / ${ratio}` }}
+      />
+    );
+  }
 
   return (
     <svg

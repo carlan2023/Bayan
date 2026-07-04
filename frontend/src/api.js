@@ -54,10 +54,23 @@ export const api = {
     updateProduct: (id, body) => request(`/admin/products/${id}`, { method: "PUT", body }),
     deleteProduct: (id) => request(`/admin/products/${id}`, { method: "DELETE" }),
     customers: () => request("/admin/customers"),
+    uploadImage: async (file) => {
+      const body = new FormData();
+      body.append("file", file);
+      const token = getToken();
+      const res = await fetch(`${BASE}/admin/uploads`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      return data; // { url }
+    },
   },
 };
 
 export const fmtPrice = (cents) =>
-  new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(
+  new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(
     cents / 100
   );

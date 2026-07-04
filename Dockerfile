@@ -22,6 +22,8 @@ FROM node:22-alpine
 WORKDIR /app/backend
 ENV NODE_ENV=production
 ENV PORT=8080
+# Uploaded product images live here; mount a Railway volume at /data to persist them.
+ENV UPLOAD_DIR=/data/uploads
 
 # Bring over the built frontend and the backend (with node_modules).
 COPY --from=build /app/frontend/dist ../frontend/dist

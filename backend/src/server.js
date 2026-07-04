@@ -8,7 +8,7 @@ import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
 import wishlistRoutes from "./routes/wishlist.js";
-import adminRoutes from "./routes/admin.js";
+import adminRoutes, { UPLOAD_DIR } from "./routes/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +22,9 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Uploaded product images (persisted on a volume in production).
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 // In production (e.g. Railway) serve the built frontend from the same service,
 // so the SPA and API share one origin and no CORS/proxy config is needed.

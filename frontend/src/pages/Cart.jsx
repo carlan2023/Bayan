@@ -18,7 +18,7 @@ export default function Cart() {
     );
   }
 
-  const delivery = subtotal >= 500000 ? 0 : 25000;
+  const delivery = subtotal >= 20000000 ? 0 : 1000000;
 
   return (
     <div className="container" style={{ paddingBottom: 40 }}>

@@ -1,9 +1,31 @@
 import { Router } from "express";
 import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 import { User, Product, Order, ORDER_STATUSES } from "../db.js";
 import { requireAuth } from "../auth.js";
 
 const router = Router();
+
+// Where uploaded product images are written. In production this is a Railway
+// volume mount (UPLOAD_DIR=/data/uploads) so files survive redeploys; locally it
+// falls back to backend/uploads. server.js serves this directory at /uploads.
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve("uploads");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const ext = (path.extname(file.originalname || "") || ".jpg").toLowerCase().slice(0, 8);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) =>
+    /^image\//.test(file.mimetype) ? cb(null, true) : cb(new Error("Only image files are allowed")),
+});
 
 /** Admin gate: valid JWT + is_admin re-checked against the DB on every request. */
 function requireAdmin(req, res, next) {
@@ -235,6 +257,7 @@ const productFields = (b) => ({
   price_cents: Number(b.price_cents),
   compare_at_cents: b.compare_at_cents ? Number(b.compare_at_cents) : null,
   swatch: b.swatch.toLowerCase(),
+  image: b.image?.trim() || null,
   colors: b.colors,
   sizes: b.sizes.map((s) => String(s).trim()),
   fabric: b.fabric?.trim() || null,
@@ -301,6 +324,16 @@ router.delete("/products/:id", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/* ================= Image upload ================= */
+
+router.post("/uploads", (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    res.status(201).json({ url: `/uploads/${req.file.filename}` });
+  });
 });
 
 /* ================= Customers ================= */

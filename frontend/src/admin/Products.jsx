@@ -11,6 +11,7 @@ const emptyForm = {
   description: "",
   fabric: "",
   swatch: "#2e4b3f",
+  image: "",
   colors: [{ name: "", hex: "#2e4b3f" }],
   sizes: "XS, S, M, L, XL",
   stock: "40",
@@ -26,6 +27,7 @@ function toForm(p) {
     description: p.description,
     fabric: p.fabric || "",
     swatch: p.swatch,
+    image: p.image || "",
     colors: p.colors.map((c) => ({ ...c })),
     sizes: p.sizes.join(", "),
     stock: String(p.stock),
@@ -42,6 +44,7 @@ function toPayload(f) {
     description: f.description,
     fabric: f.fabric,
     swatch: f.swatch,
+    image: f.image.trim(),
     colors: f.colors.filter((c) => c.name.trim()),
     sizes: f.sizes.split(",").map((s) => s.trim()).filter(Boolean),
     stock: Number(f.stock),
@@ -56,6 +59,7 @@ export default function Products() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [filter, setFilter] = useState("");
 
   const load = () => api.products({ limit: 100 }).then((d) => setProducts(d.products));
@@ -71,6 +75,22 @@ export default function Products() {
       const colors = f.colors.map((c, idx) => (idx === i ? { ...c, [key]: value } : c));
       return { ...f, colors };
     });
+  }
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    try {
+      const { url } = await api.admin.uploadImage(file);
+      setForm((f) => ({ ...f, image: url }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function save(e) {
@@ -165,11 +185,11 @@ export default function Products() {
           </div>
           <div className="form-3col">
             <div>
-              <label>Price (KES) *</label>
+              <label>Price (UGX) *</label>
               <input required type="number" min="1" step="1" value={form.price} onChange={set("price")} />
             </div>
             <div>
-              <label>Compare-at price (KES)</label>
+              <label>Compare-at price (UGX)</label>
               <input type="number" min="0" step="1" value={form.compare_at} onChange={set("compare_at")} placeholder="optional — shows a Sale badge" />
             </div>
             <div>
@@ -180,6 +200,47 @@ export default function Products() {
           <div>
             <label>Description *</label>
             <textarea required rows="3" value={form.description} onChange={set("description")} />
+          </div>
+          <div>
+            <label>Product image</label>
+            <div className="color-row" style={{ alignItems: "flex-start", gap: 12 }}>
+              {form.image ? (
+                <img
+                  src={form.image}
+                  alt="preview"
+                  style={{ width: 64, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line, #ddd)" }}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span
+                  className="mini-swatch"
+                  style={{ width: 64, height: 78, borderRadius: 8, background: form.swatch }}
+                  title="No image — the store shows generated art"
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <input
+                  style={{ width: "100%" }}
+                  placeholder="Paste an image URL, or upload a file →"
+                  value={form.image}
+                  onChange={set("image")}
+                />
+                <div className="tools" style={{ marginTop: 8 }}>
+                  <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", margin: 0 }}>
+                    {uploading ? "Uploading…" : "Upload file"}
+                    <input type="file" accept="image/*" hidden onChange={onUpload} disabled={uploading} />
+                  </label>
+                  {form.image && (
+                    <button type="button" className="link-btn" onClick={() => setForm((f) => ({ ...f, image: "" }))}>
+                      Remove image
+                    </button>
+                  )}
+                </div>
+                <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                  Leave empty to use the generated swatch art.
+                </span>
+              </div>
+            </div>
           </div>
           <div className="form-3col">
             <div>

@@ -5,8 +5,8 @@ import { optionalAuth, requireAuth } from "../auth.js";
 
 const router = Router();
 
-const FREE_DELIVERY_THRESHOLD = 500000; // in cents
-const DELIVERY_FEE = 25000; // in cents
+const FREE_DELIVERY_THRESHOLD = 20000000; // UGX 200,000 (stored as cents)
+const DELIVERY_FEE = 1000000; // UGX 10,000 (stored as cents)
 
 /**
  * Create an order (Cash on Delivery).

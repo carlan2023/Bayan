@@ -116,7 +116,7 @@ export default function Product() {
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
           <div className="meta-line">
             {product.stock > 10 ? "In stock" : `Only ${product.stock} left`} · Cash on delivery available ·
-            Free delivery over KES 5,000
+            Free delivery over UGX 200,000
           </div>
         </div>
       </div>

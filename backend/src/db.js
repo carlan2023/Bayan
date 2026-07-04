@@ -41,6 +41,7 @@ const productSchema = new mongoose.Schema(
     price_cents: { type: Number, required: true, min: 1 },
     compare_at_cents: { type: Number, default: null },
     swatch: { type: String, required: true },
+    image: { type: String, default: null },
     colors: [{ _id: false, name: String, hex: String }],
     sizes: [String],
     fabric: { type: String, default: null },

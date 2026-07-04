@@ -20,7 +20,7 @@ export default function Checkout() {
   const [placing, setPlacing] = useState(false);
   const [order, setOrder] = useState(null);
 
-  const delivery = subtotal >= 500000 ? 0 : 25000;
+  const delivery = subtotal >= 20000000 ? 0 : 1000000;
 
   if (order) {
     return (

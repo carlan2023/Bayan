@@ -21,7 +21,7 @@ export default function Header() {
 
   return (
     <>
-      <div className="topbar">Free delivery on orders over KES 5,000 · Cash on delivery available</div>
+      <div className="topbar">Free delivery on orders over UGX 200,000 · Cash on delivery available</div>
       <header className="header">
         <div className="container header-inner">
           <Link to="/" className="logo">
