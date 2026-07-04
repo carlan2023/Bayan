@@ -1,0 +1,58 @@
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { AuthProvider, CartProvider } from "./store";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import Home from "./pages/Home";
+import Catalog from "./pages/Catalog";
+import Product from "./pages/Product";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import Auth from "./pages/Auth";
+import Account from "./pages/Account";
+import Wishlist from "./pages/Wishlist";
+import AdminLayout from "./admin/AdminLayout";
+import AdminDashboard from "./admin/Dashboard";
+import AdminProducts from "./admin/Products";
+import AdminOrders from "./admin/Orders";
+import AdminCustomers from "./admin/Customers";
+
+function ShopLayout() {
+  return (
+    <>
+      <Header />
+      <main>
+        <Outlet />
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <CartProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<ShopLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/shop" element={<Catalog />} />
+              <Route path="/product/:slug" element={<Product />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/account" element={<Account />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+            </Route>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<AdminProducts />} />
+              <Route path="orders" element={<AdminOrders />} />
+              <Route path="customers" element={<AdminCustomers />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </CartProvider>
+    </AuthProvider>
+  );
+}

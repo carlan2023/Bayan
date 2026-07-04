@@ -1,0 +1,155 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api, fmtPrice } from "../api";
+import { useAuth, useCart } from "../store";
+
+export default function Checkout() {
+  const { items, subtotal, clear } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    customer_name: user?.name || "",
+    phone: "",
+    email: user?.email || "",
+    address: "",
+    city: "",
+    note: "",
+  });
+  const [error, setError] = useState("");
+  const [placing, setPlacing] = useState(false);
+  const [order, setOrder] = useState(null);
+
+  const delivery = subtotal >= 500000 ? 0 : 25000;
+
+  if (order) {
+    return (
+      <div className="container empty">
+        <h2>Thank you, {order.customer_name.split(" ")[0]}!</h2>
+        <p style={{ maxWidth: 480, margin: "0 auto 8px" }}>
+          Order <strong>#{order.number}</strong> is confirmed for <strong>{fmtPrice(order.total_cents)}</strong>.
+        </p>
+        <p style={{ maxWidth: 480, margin: "0 auto 24px" }}>
+          Please have the cash ready when our courier arrives at {order.address}, {order.city}.
+        </p>
+        <Link to="/shop" className="btn btn-primary">
+          Continue shopping
+        </Link>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="container empty">
+        <h2>Nothing to check out</h2>
+        <Link to="/shop" className="btn btn-primary">
+          Browse products
+        </Link>
+      </div>
+    );
+  }
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function placeOrder(e) {
+    e.preventDefault();
+    setError("");
+    setPlacing(true);
+    try {
+      const { order } = await api.createOrder({
+        ...form,
+        items: items.map((i) => ({ product_id: i.product_id, qty: i.qty, size: i.size, color: i.color })),
+      });
+      clear();
+      setOrder(order);
+      window.scrollTo(0, 0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPlacing(false);
+    }
+  }
+
+  return (
+    <div className="container">
+      <div className="page-title">
+        <h1>Checkout</h1>
+        <p>Payment method: cash on delivery.</p>
+      </div>
+      <div className="checkout-layout">
+        <form className="panel form-grid" onSubmit={placeOrder}>
+          {!user && (
+            <div className="alert alert-ok">
+              Checking out as a guest. <Link to="/login" style={{ textDecoration: "underline" }}>Sign in</Link>{" "}
+              to save this order to your account.
+            </div>
+          )}
+          {error && <div className="alert alert-error">{error}</div>}
+
+          <div className="two-col">
+            <div>
+              <label>Full name *</label>
+              <input required value={form.customer_name} onChange={set("customer_name")} />
+            </div>
+            <div>
+              <label>Phone *</label>
+              <input required type="tel" placeholder="07XX XXX XXX" value={form.phone} onChange={set("phone")} />
+            </div>
+          </div>
+          <div>
+            <label>Email</label>
+            <input type="email" value={form.email} onChange={set("email")} />
+          </div>
+          <div>
+            <label>Delivery address *</label>
+            <input required placeholder="Street, building, apartment" value={form.address} onChange={set("address")} />
+          </div>
+          <div className="two-col">
+            <div>
+              <label>City / town *</label>
+              <input required value={form.city} onChange={set("city")} />
+            </div>
+            <div>
+              <label>Delivery note</label>
+              <input placeholder="e.g. call on arrival" value={form.note} onChange={set("note")} />
+            </div>
+          </div>
+
+          <div className="cod-note">
+            <strong>Cash on delivery.</strong> You pay {fmtPrice(subtotal + delivery)} in cash when the
+            courier hands over your order. Orders are confirmed by phone before dispatch.
+          </div>
+
+          <button className="btn btn-accent btn-block" disabled={placing}>
+            {placing ? "Placing order…" : `Place order — ${fmtPrice(subtotal + delivery)}`}
+          </button>
+        </form>
+
+        <div className="panel">
+          <h3 style={{ marginBottom: 12 }}>Order summary</h3>
+          {items.map((i) => (
+            <div className="summary-line" key={`${i.product_id}-${i.size}-${i.color}`}>
+              <span>
+                {i.name} × {i.qty}
+                <span style={{ color: "var(--ink-soft)", fontSize: "0.82rem" }}>
+                  {" "}
+                  ({i.size}, {i.color})
+                </span>
+              </span>
+              <span>{fmtPrice(i.price_cents * i.qty)}</span>
+            </div>
+          ))}
+          <div className="summary-line">
+            <span>Delivery</span>
+            <span>{delivery === 0 ? "Free" : fmtPrice(delivery)}</span>
+          </div>
+          <div className="summary-line total">
+            <span>Total due on delivery</span>
+            <span>{fmtPrice(subtotal + delivery)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

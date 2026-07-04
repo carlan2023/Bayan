@@ -1,0 +1,145 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-test:
+    name: Backend — syntax, seed & API smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://localhost:27017/bayan_ci
+      JWT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Syntax check
+        run: |
+          for f in $(find src -name '*.js'); do node --check "$f"; done
+
+      - name: Seed database
+        run: node src/seed.js
+
+      - name: Boot server & smoke-test API
+        run: |
+          node src/server.js &
+          SERVER_PID=$!
+          sleep 3
+
+          fail() { echo "::error::$1"; kill $SERVER_PID; exit 1; }
+
+          # health
+          curl -sf localhost:4000/api/health | grep -q '"ok":true' || fail "health check failed"
+
+          # catalog + search
+          COUNT=$(curl -sf "localhost:4000/api/products" | python3 -c "import json,sys; print(json.load(sys.stdin)['count'])")
+          [ "$COUNT" -ge 1 ] || fail "catalog empty after seed"
+          curl -sf "localhost:4000/api/products?search=linen" | grep -qi linen || fail "search failed"
+
+          # auth: register + login + me
+          TOKEN=$(curl -sf -X POST localhost:4000/api/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"CI User","email":"ci@test.com","password":"citest1"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])") || fail "register failed"
+          curl -sf localhost:4000/api/auth/me -H "Authorization: Bearer $TOKEN" \
+            | grep -q ci@test.com || fail "auth/me failed"
+
+          # guest COD order (product id fetched from the catalog)
+          PID=$(curl -sf "localhost:4000/api/products?limit=1" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          ORDER=$(curl -sf -X POST localhost:4000/api/orders \
+            -H 'Content-Type: application/json' \
+            -d "{\"customer_name\":\"CI Guest\",\"phone\":\"0700000000\",\"address\":\"1 Test St\",\"city\":\"Nairobi\",\"items\":[{\"product_id\":\"$PID\",\"qty\":1,\"size\":\"M\",\"color\":\"Forest\"}]}")
+          echo "$ORDER" | grep -q '"payment_method":"cod"' || fail "order creation failed"
+          OID=$(echo "$ORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['id'])")
+
+          # admin: login, stats, order status, non-admin gate
+          ADMIN=$(curl -sf -X POST localhost:4000/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@bayan.local","password":"admin123"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])") || fail "admin login failed"
+          curl -sf localhost:4000/api/admin/stats -H "Authorization: Bearer $ADMIN" \
+            | grep -q revenue_cents || fail "admin stats failed"
+          curl -sf -X PATCH "localhost:4000/api/admin/orders/$OID" \
+            -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+            -d '{"status":"confirmed"}' | grep -q confirmed || fail "order status update failed"
+          GATE=$(curl -s -o /dev/null -w "%{http_code}" localhost:4000/api/admin/stats -H "Authorization: Bearer $TOKEN")
+          [ "$GATE" = "403" ] || fail "non-admin was not blocked from admin API (got $GATE)"
+
+          kill $SERVER_PID
+          echo "All API smoke tests passed."
+
+  frontend-build:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service "$RAILWAY_SERVICE_ID" --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
