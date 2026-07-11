@@ -67,6 +67,7 @@ export function CartProvider({ children }) {
     subtotal: items.reduce((s, i) => s + i.price_cents * i.qty, 0),
     add(product, { size, color, qty = 1 }) {
       setItems((prev) => {
+        const colorImage = product.colors?.find((c) => c.name === color)?.image;
         const entry = {
           product_id: product.id,
           slug: product.slug,
@@ -74,6 +75,7 @@ export function CartProvider({ children }) {
           price_cents: product.price_cents,
           swatch: product.swatch,
           category: product.category,
+          image: colorImage || product.image || null,
           size,
           color,
           qty,

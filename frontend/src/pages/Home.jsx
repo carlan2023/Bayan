@@ -7,7 +7,7 @@ const CAT_COLORS = {
   Women: "linear-gradient(135deg, #2e4b3f, #4a6b5a)",
   Men: "linear-gradient(135deg, #22303a, #40566b)",
   Kids: "linear-gradient(135deg, #b06a4d, #cf8a66)",
-  Home: "linear-gradient(135deg, #8b6d50, #b09272)",
+  Accessories: "linear-gradient(135deg, #6e5a43, #c9a24b)",
 };
 
 export default function Home() {
@@ -15,7 +15,9 @@ export default function Home() {
   const [cats, setCats] = useState([]);
 
   useEffect(() => {
-    api.products({ featured: 1, limit: 8 }).then((d) => setFeatured(d.products));
+    api
+      .products({ featured: 1, limit: 8 })
+      .then((d) => setFeatured(d.products));
     api.categories().then((d) => setCats(d.categories));
   }, []);
 
@@ -28,8 +30,8 @@ export default function Home() {
             Dress well. Live well. <em>Pay at your door.</em>
           </h1>
           <p>
-            Considered clothing and homeware in natural fabrics and honest colours — delivered
-            countrywide with cash on delivery.
+            Considered clothing, jewellery and fragrance in natural fabrics and
+            honest colours — delivered countrywide with cash on delivery.
           </p>
           <Link to="/shop" className="btn btn-accent">
             Shop the collection
@@ -47,7 +49,7 @@ export default function Home() {
               key={c.category}
               to={`/shop?category=${c.category}`}
               className="cat-card"
-              style={{ background: CAT_COLORS[c.category] || CAT_COLORS.Home }}
+              style={{ background: CAT_COLORS[c.category] || CAT_COLORS.Accessories }}
             >
               <h3>{c.category}</h3>
               <span>{c.count} pieces</span>
@@ -72,15 +74,24 @@ export default function Home() {
         <div className="perks">
           <div className="perk">
             <h3>Cash on delivery</h3>
-            <p>Order now, pay when your parcel reaches your hands. No card required.</p>
+            <p>
+              Order now, pay when your parcel reaches your hands. No card
+              required.
+            </p>
           </div>
           <div className="perk">
             <h3>Free delivery over UGX 200,000</h3>
-            <p>Flat UGX 10,000 delivery on smaller orders, anywhere in the country.</p>
+            <p>
+              Flat UGX 10,000 delivery on smaller orders, anywhere in the
+              country.
+            </p>
           </div>
           <div className="perk">
-            <h3>30-day returns</h3>
-            <p>Changed your mind? Send it back within 30 days, no questions asked.</p>
+            <h3>Genuine &amp; quality-checked</h3>
+            <p>
+              Every piece — from jewellery to fragrance — is sourced authentic
+              and inspected before it ships.
+            </p>
           </div>
         </div>
       </section>

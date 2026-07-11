@@ -10,7 +10,8 @@ const ICONS = {
   Women: "M50 22c-6 0-10 5-10 11 0 4 2 7 4 9L30 78h40L56 42c2-2 4-5 4-9 0-6-4-11-10-11z",
   Men: "M32 30l12-8h12l12 8 6 28h-10l-2 22H38l-2-22H26z",
   Kids: "M50 20a9 9 0 100 18 9 9 0 000-18zM34 44l16-4 16 4 4 20h-8l-2 16H40l-2-16h-8z",
-  Home: "M50 20L22 46h8v32h40V46h8zM42 60h16v18H42z",
+  // Perfume bottle — the Accessories department (jewellery & fragrance).
+  Accessories: "M44 20h12v8h-12zM40 30h20a6 6 0 016 6v36a6 6 0 01-6 6H40a6 6 0 01-6-6V36a6 6 0 016-6zM42 44h16v10H42z",
 };
 
 function shade(hex, amt) {
@@ -25,7 +26,7 @@ export default function ProductImage({ product, ratio = 1.22 }) {
   const base = product.swatch || "#2e4b3f";
   const light = shade(base, 46);
   const dark = shade(base, -34);
-  const icon = ICONS[product.category] || ICONS.Home;
+  const icon = ICONS[product.category] || ICONS.Accessories;
   const gid = `g-${product.id || product.slug}`;
 
   if (product.image && !failed) {

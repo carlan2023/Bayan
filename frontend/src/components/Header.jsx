@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth, useCart } from "../store";
 import { HeartIcon, BagIcon } from "./Icons";
 
-const CATEGORIES = ["Women", "Men", "Kids", "Home"];
+const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
 export default function Header() {
   const { user, logout } = useAuth();

@@ -34,6 +34,10 @@ export default function Product() {
   if (!data) return <div className="spinner">Loading…</div>;
   const { product, related } = data;
 
+  // Show the photo for the chosen colour, falling back to the product's main image.
+  const activeColor = product.colors.find((c) => c.name === color);
+  const heroProduct = { ...product, image: activeColor?.image || product.image };
+
   function addToBag() {
     if (!size) {
       setError("Please choose a size first.");
@@ -62,7 +66,7 @@ export default function Product() {
     <div className="container">
       <div className="pdp">
         <div className="pdp-img">
-          <ProductImage product={product} ratio={1.1} />
+          <ProductImage product={heroProduct} ratio={1.1} />
         </div>
         <div className="pdp-info">
           <div className="cat">{product.category}</div>

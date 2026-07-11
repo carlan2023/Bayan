@@ -7,12 +7,12 @@ export default function Footer() {
             Ba<em>y</em>an
           </div>
           <p style={{ maxWidth: 320, fontSize: "0.9rem" }}>
-            Considered clothing and homeware. Made to last, priced to be lived in.
+            Considered clothing, jewellery and fragrance. Made to last, priced to be lived in.
           </p>
         </div>
         <div style={{ fontSize: "0.9rem", lineHeight: 2 }}>
           <div>Cash on delivery, countrywide</div>
-          <div>30-day easy returns</div>
+          <div>Genuine &amp; quality-checked</div>
           <div>support@bayan.example</div>
         </div>
       </div>

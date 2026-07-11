@@ -239,6 +239,8 @@ function validateProduct(body) {
     body.colors.some((c) => !c.name || !/^#[0-9a-fA-F]{6}$/.test(c.hex || ""))
   )
     errors.push("colors must be a non-empty array of {name, hex}");
+  else if (body.colors.some((c) => !String(c.image || "").trim()))
+    errors.push("each colour must have a product image");
   if (!Array.isArray(body.sizes) || body.sizes.length === 0 || body.sizes.some((s) => !String(s).trim()))
     errors.push("sizes must be a non-empty array of strings");
   const stock = Number(body.stock);
@@ -257,8 +259,14 @@ const productFields = (b) => ({
   price_cents: Number(b.price_cents),
   compare_at_cents: b.compare_at_cents ? Number(b.compare_at_cents) : null,
   swatch: b.swatch.toLowerCase(),
-  image: b.image?.trim() || null,
-  colors: b.colors,
+  // Hero image: use the explicit one, otherwise fall back to the first colour's
+  // photo so every product always ships with a real image (no placeholders).
+  image: b.image?.trim() || b.colors?.find((c) => c.image?.trim())?.image?.trim() || null,
+  colors: b.colors.map((c) => ({
+    name: String(c.name).trim(),
+    hex: String(c.hex).toLowerCase(),
+    image: String(c.image || "").trim() || null,
+  })),
   sizes: b.sizes.map((s) => String(s).trim()),
   fabric: b.fabric?.trim() || null,
   featured: !!b.featured,

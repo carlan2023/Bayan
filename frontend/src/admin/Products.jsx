@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, fmtPrice } from "../api";
 
-const CATEGORIES = ["Women", "Men", "Kids", "Home"];
+const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
 const emptyForm = {
   name: "",
@@ -12,7 +12,7 @@ const emptyForm = {
   fabric: "",
   swatch: "#2e4b3f",
   image: "",
-  colors: [{ name: "", hex: "#2e4b3f" }],
+  colors: [{ name: "", hex: "#2e4b3f", image: "" }],
   sizes: "XS, S, M, L, XL",
   stock: "40",
   featured: false,
@@ -28,7 +28,7 @@ function toForm(p) {
     fabric: p.fabric || "",
     swatch: p.swatch,
     image: p.image || "",
-    colors: p.colors.map((c) => ({ ...c })),
+    colors: p.colors.map((c) => ({ name: c.name, hex: c.hex, image: c.image || "" })),
     sizes: p.sizes.join(", "),
     stock: String(p.stock),
     featured: p.featured,
@@ -45,7 +45,9 @@ function toPayload(f) {
     fabric: f.fabric,
     swatch: f.swatch,
     image: f.image.trim(),
-    colors: f.colors.filter((c) => c.name.trim()),
+    colors: f.colors
+      .filter((c) => c.name.trim())
+      .map((c) => ({ name: c.name.trim(), hex: c.hex, image: (c.image || "").trim() })),
     sizes: f.sizes.split(",").map((s) => s.trim()).filter(Boolean),
     stock: Number(f.stock),
     featured: f.featured,
@@ -60,6 +62,7 @@ export default function Products() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [colorUploading, setColorUploading] = useState(null); // index currently uploading
   const [filter, setFilter] = useState("");
 
   const load = () => api.products({ limit: 100 }).then((d) => setProducts(d.products));
@@ -75,6 +78,22 @@ export default function Products() {
       const colors = f.colors.map((c, idx) => (idx === i ? { ...c, [key]: value } : c));
       return { ...f, colors };
     });
+  }
+
+  async function onColorUpload(i, e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setError("");
+    setColorUploading(i);
+    try {
+      const { url } = await api.admin.uploadImage(file);
+      setColor(i, "image", url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setColorUploading(null);
+    }
   }
 
   async function onUpload(e) {
@@ -202,7 +221,7 @@ export default function Products() {
             <textarea required rows="3" value={form.description} onChange={set("description")} />
           </div>
           <div>
-            <label>Product image</label>
+            <label>Main image (optional — defaults to the first colour's photo)</label>
             <div className="color-row" style={{ alignItems: "flex-start", gap: 12 }}>
               {form.image ? (
                 <img
@@ -237,7 +256,7 @@ export default function Products() {
                   )}
                 </div>
                 <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  Leave empty to use the generated swatch art.
+                  Leave empty and the first colour's photo becomes the main image.
                 </span>
               </div>
             </div>
@@ -260,9 +279,23 @@ export default function Products() {
             </div>
           </div>
           <div>
-            <label>Colour options *</label>
+            <label>Colour options * — upload the product photo for each colour</label>
             {form.colors.map((c, i) => (
-              <div className="color-row" key={i}>
+              <div className="color-row" key={i} style={{ alignItems: "center" }}>
+                {c.image ? (
+                  <img
+                    src={c.image}
+                    alt={c.name || "colour"}
+                    style={{ width: 48, height: 58, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line, #ddd)" }}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <span
+                    className="mini-swatch"
+                    style={{ width: 48, height: 58, borderRadius: 8, background: c.hex }}
+                    title="No photo yet for this colour"
+                  />
+                )}
                 <input type="color" value={c.hex} onChange={(e) => setColor(i, "hex", e.target.value)} />
                 <input
                   className="input-sm"
@@ -271,6 +304,16 @@ export default function Products() {
                   value={c.name}
                   onChange={(e) => setColor(i, "name", e.target.value)}
                 />
+                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", margin: 0 }}>
+                  {colorUploading === i ? "Uploading…" : c.image ? "Replace photo" : "Upload photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => onColorUpload(i, e)}
+                    disabled={colorUploading !== null}
+                  />
+                </label>
                 {form.colors.length > 1 && (
                   <button
                     type="button"
@@ -285,7 +328,7 @@ export default function Products() {
             <button
               type="button"
               className="link-btn"
-              onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: "#b06a4d" }] }))}
+              onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: "#b06a4d", image: "" }] }))}
             >
               + Add colour
             </button>
