@@ -1,30 +1,45 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtPrice } from "../api";
-import { useCart } from "../store";
+import { useCart, useDelivery } from "../store";
 import ProductImage from "../components/ProductImage";
+import CartNotice from "../components/CartNotice";
 
 export default function Cart() {
-  const { items, subtotal, setQty, remove, keyOf } = useCart();
+  const { items, subtotal, setQty, remove, keyOf, revalidate, maxQty } = useCart();
+  const delivery = useDelivery(subtotal);
+  const [changes, setChanges] = useState([]);
+
+  // Prices and stock may have moved since these lines were saved to localStorage.
+  useEffect(() => {
+    revalidate().then(setChanges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (items.length === 0) {
     return (
-      <div className="container empty">
-        <h2>Your bag is empty</h2>
-        <p style={{ marginBottom: 24 }}>Everything you add will appear here.</p>
-        <Link to="/shop" className="btn btn-primary">
-          Start shopping
-        </Link>
+      <div className="container">
+        {/* Explain an emptied bag — otherwise a sold-out clear-out looks like a bug. */}
+        <div style={{ maxWidth: 520, margin: "24px auto 0" }}>
+          <CartNotice changes={changes} />
+        </div>
+        <div className="empty">
+          <h2>Your bag is empty</h2>
+          <p style={{ marginBottom: 24 }}>Everything you add will appear here.</p>
+          <Link to="/shop" className="btn btn-primary">
+            Start shopping
+          </Link>
+        </div>
       </div>
     );
   }
-
-  const delivery = subtotal >= 20000000 ? 0 : 1000000;
 
   return (
     <div className="container" style={{ paddingBottom: 40 }}>
       <div className="page-title">
         <h1>Your bag</h1>
       </div>
+      <CartNotice changes={changes} />
       <div className="checkout-layout">
         <div className="panel">
           {items.map((i) => {
@@ -46,9 +61,17 @@ export default function Cart() {
                   </button>
                 </div>
                 <div className="qty-ctrl">
-                  <button onClick={() => setQty(k, i.qty - 1)}>−</button>
+                  <button aria-label={`Decrease quantity of ${i.name}`} onClick={() => setQty(k, i.qty - 1)}>
+                    −
+                  </button>
                   <span>{i.qty}</span>
-                  <button onClick={() => setQty(k, i.qty + 1)}>+</button>
+                  <button
+                    aria-label={`Increase quantity of ${i.name}`}
+                    disabled={i.qty >= Math.min(i.stock ?? maxQty, maxQty)}
+                    onClick={() => setQty(k, i.qty + 1)}
+                  >
+                    +
+                  </button>
                 </div>
                 <div className="price">{fmtPrice(i.price_cents * i.qty)}</div>
               </div>

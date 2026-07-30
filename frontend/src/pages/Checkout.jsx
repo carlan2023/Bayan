@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, fmtPrice } from "../api";
-import { useAuth, useCart } from "../store";
+import { useAuth, useCart, useDelivery } from "../store";
+import CartNotice from "../components/CartNotice";
 
 export default function Checkout() {
-  const { items, subtotal, clear } = useCart();
+  const { items, subtotal, clear, revalidate } = useCart();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const delivery = useDelivery(subtotal);
 
   const [form, setForm] = useState({
     customer_name: user?.name || "",
@@ -19,8 +20,14 @@ export default function Checkout() {
   const [error, setError] = useState("");
   const [placing, setPlacing] = useState(false);
   const [order, setOrder] = useState(null);
+  const [changes, setChanges] = useState([]);
 
-  const delivery = subtotal >= 20000000 ? 0 : 1000000;
+  // Last chance to catch a price or stock change before the shopper commits —
+  // the server re-prices every line from the DB when the order is created.
+  useEffect(() => {
+    revalidate().then(setChanges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (order) {
     return (
@@ -41,11 +48,16 @@ export default function Checkout() {
 
   if (items.length === 0) {
     return (
-      <div className="container empty">
-        <h2>Nothing to check out</h2>
-        <Link to="/shop" className="btn btn-primary">
-          Browse products
-        </Link>
+      <div className="container">
+        <div style={{ maxWidth: 520, margin: "24px auto 0" }}>
+          <CartNotice changes={changes} />
+        </div>
+        <div className="empty">
+          <h2>Nothing to check out</h2>
+          <Link to="/shop" className="btn btn-primary">
+            Browse products
+          </Link>
+        </div>
       </div>
     );
   }
@@ -66,6 +78,9 @@ export default function Checkout() {
       window.scrollTo(0, 0);
     } catch (err) {
       setError(err.message);
+      // A rejected order usually means stock or price moved under us — pull the
+      // current numbers in so the bag on screen matches what the server will take.
+      revalidate().then(setChanges);
     } finally {
       setPlacing(false);
     }
@@ -86,6 +101,7 @@ export default function Checkout() {
             </div>
           )}
           {error && <div className="alert alert-error">{error}</div>}
+          <CartNotice changes={changes} />
 
           <div className="two-col">
             <div>

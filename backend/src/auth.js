@@ -1,5 +1,14 @@
 import jwt from "jsonwebtoken";
 
+// The development fallback is published in this repo, so anyone could forge a
+// token with it. Refuse to boot in production rather than run on a known secret.
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.error(
+    "FATAL: JWT_SECRET is not set. Set it to a long random string on the service before deploying."
+  );
+  process.exit(1);
+}
+
 export const JWT_SECRET = process.env.JWT_SECRET || "bayan-dev-secret-change-in-production";
 
 export function signToken(user) {

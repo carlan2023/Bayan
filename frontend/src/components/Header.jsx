@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useAuth, useCart } from "../store";
+import { useAuth, useCart, useConfig } from "../store";
+import { fmtPrice } from "../api";
 import { HeartIcon, BagIcon } from "./Icons";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
@@ -8,6 +9,7 @@ const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 export default function Header() {
   const { user, logout } = useAuth();
   const { count } = useCart();
+  const { free_delivery_threshold_cents } = useConfig();
   const [q, setQ] = useState("");
   const navigate = useNavigate();
 
@@ -21,7 +23,9 @@ export default function Header() {
 
   return (
     <>
-      <div className="topbar">Free delivery on orders over UGX 200,000 · Cash on delivery available</div>
+      <div className="topbar">
+        Free delivery on orders over {fmtPrice(free_delivery_threshold_cents)} · Cash on delivery available
+      </div>
       <header className="header">
         <div className="container header-inner">
           <Link to="/" className="logo">

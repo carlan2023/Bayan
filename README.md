@@ -38,21 +38,23 @@ Open http://localhost:5173. The Vite dev server proxies `/api` to the backend.
 - Cart (persists in localStorage) with quantity controls and delivery calculation
 - **Real checkout with Cash on Delivery** — guest or signed-in; server re-prices every line from the DB and reserves stock with guarded conditional updates (safe on standalone MongoDB, no replica set required)
 - Accounts: register/login (JWT), order history, wishlist
-- Free delivery over KES 5,000, otherwise KES 250 (constants in `backend/src/routes/orders.js`)
+- Free delivery over UGX 200,000, otherwise UGX 10,000 — constants live in `backend/src/config.js` and are served to the client at `GET /api/config`, so the cart can never quote a total the server won't honour
 
 ## Admin dashboard
 
 Open http://localhost:5173/admin and sign in as the super user:
 
-- **Email:** `admin@bayan.local` — **Password:** `admin123`
+- **Email:** `admin@bayan.local` — **Password:** `admin123` (development only)
 - Override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars before first boot; the account is created automatically.
+- In production (`NODE_ENV=production`) the `admin123` fallback is never used: if `ADMIN_PASSWORD` is unset, a random password is generated and printed **once** to the deploy logs. Capture it then, or set `ADMIN_PASSWORD` yourself.
 
 Features: analytics overview (revenue, orders, AOV, customers, 14-day revenue chart, orders-by-status and revenue-by-category donuts, top products, low stock alerts, recent orders), full product management (create / edit / delete with colour and size editors, featured flag, sale pricing), order management (filter by status, view line items, advance status: pending → confirmed → dispatched → delivered; cancelling restocks inventory), and a customer list with lifetime spend. Admin endpoints live under `/api/admin/*` and re-check the admin flag in the database on every request.
 
 ## API
 
 ```
-GET    /api/products?category=&search=&sort=&featured=&limit=
+GET    /api/config                 (currency + delivery pricing)
+GET    /api/products?category=&search=&sort=&featured=&limit=&ids=
 GET    /api/products/categories
 GET    /api/products/:slug
 POST   /api/auth/register | /api/auth/login
@@ -80,8 +82,8 @@ The seed script is idempotent (skips if products exist), and `/api/health` is co
 ## Notes
 
 - Product visuals are generated SVGs derived from each product's swatch colour (fully offline). Swap `frontend/src/components/ProductImage.jsx` for `<img>` tags when real photography exists.
-- Currency is KES; change `fmtPrice` in `frontend/src/api.js` and the topbar/perks copy to switch.
-- Set `JWT_SECRET`, `PORT`, `MONGODB_URI` via environment variables in production.
+- Currency is UGX; change `CURRENCY` in `backend/src/config.js` and `fmtPrice` in `frontend/src/api.js` to switch. Delivery pricing copy reads from `/api/config`, so it updates everywhere on its own.
+- Set `JWT_SECRET`, `PORT`, `MONGODB_URI` via environment variables in production. **The server refuses to start when `NODE_ENV=production` and `JWT_SECRET` is unset** — the development fallback is published in this repo, so anyone could forge a token with it.
 - To reseed, drop the `products` collection (e.g. `mongosh bayan --eval 'db.products.drop()'`) and run `npm run seed` again.
 - Orders get sequential human-friendly numbers (#1001, #1002, …) via a counters collection.
 
@@ -90,6 +92,7 @@ The seed script is idempotent (skips if products exist), and `/api/health` is co
 ```
 backend/
   src/server.js          Express app
+  src/config.js          Currency + delivery constants (served at /api/config)
   src/db.js              Mongoose models, connection, admin bootstrap
   src/seed.js            24-product catalog seed
   src/auth.js            JWT sign/verify middleware

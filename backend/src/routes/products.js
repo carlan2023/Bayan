@@ -1,4 +1,5 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { Product } from "../db.js";
 
 const router = Router();
@@ -14,10 +15,20 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 router.get("/", async (req, res, next) => {
   try {
-    const { category, search, sort, featured, limit } = req.query;
+    const { category, search, sort, featured, limit, ids } = req.query;
     const filter = {};
     if (category) filter.category = category;
     if (featured === "1") filter.featured = true;
+    // `ids` lets the cart re-price its lines in one round trip.
+    if (ids !== undefined) {
+      const list = String(ids)
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => mongoose.isValidObjectId(s))
+        .slice(0, 100);
+      if (list.length === 0) return res.json({ products: [], count: 0 });
+      filter._id = { $in: list };
+    }
     if (search) {
       const rx = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ name: rx }, { description: rx }, { category: rx }];

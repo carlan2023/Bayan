@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, fmtPrice } from "../api";
+import { useConfig } from "../store";
 import ProductCard from "../components/ProductCard";
 
 const CAT_COLORS = {
@@ -11,6 +12,7 @@ const CAT_COLORS = {
 };
 
 export default function Home() {
+  const { free_delivery_threshold_cents, delivery_fee_cents } = useConfig();
   const [featured, setFeatured] = useState([]);
   const [cats, setCats] = useState([]);
 
@@ -80,9 +82,9 @@ export default function Home() {
             </p>
           </div>
           <div className="perk">
-            <h3>Free delivery over UGX 200,000</h3>
+            <h3>Free delivery over {fmtPrice(free_delivery_threshold_cents)}</h3>
             <p>
-              Flat UGX 10,000 delivery on smaller orders, anywhere in the
+              Flat {fmtPrice(delivery_fee_cents)} delivery on smaller orders, anywhere in the
               country.
             </p>
           </div>

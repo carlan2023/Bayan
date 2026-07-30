@@ -65,6 +65,19 @@ jobs:
           [ "$COUNT" -ge 1 ] || fail "catalog empty after seed"
           curl -sf "localhost:4000/api/products?search=linen" | grep -qi linen || fail "search failed"
 
+          # storefront config — the client quotes totals from these
+          curl -sf localhost:4000/api/config | grep -q '"free_delivery_threshold_cents"' || fail "config endpoint failed"
+
+          # bulk lookup by id (used by the cart to re-price its lines)
+          IDS_PID=$(curl -sf "localhost:4000/api/products?limit=1" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          IDS_COUNT=$(curl -sf "localhost:4000/api/products?ids=$IDS_PID" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['count'])")
+          [ "$IDS_COUNT" = "1" ] || fail "?ids= filter returned $IDS_COUNT products, expected 1"
+          BAD_IDS=$(curl -sf "localhost:4000/api/products?ids=not-an-objectid" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['count'])")
+          [ "$BAD_IDS" = "0" ] || fail "?ids= with a malformed id returned $BAD_IDS products, expected 0"
+
           # auth: register + login + me
           TOKEN=$(curl -sf -X POST localhost:4000/api/auth/register \
             -H 'Content-Type: application/json' \
@@ -94,6 +107,39 @@ jobs:
             -d '{"status":"confirmed"}' | grep -q confirmed || fail "order status update failed"
           GATE=$(curl -s -o /dev/null -w "%{http_code}" localhost:4000/api/admin/stats -H "Authorization: Bearer $TOKEN")
           [ "$GATE" = "403" ] || fail "non-admin was not blocked from admin API (got $GATE)"
+
+          # ---- stock accounting: units must never be stranded ----
+          stock_of() {
+            curl -sf "localhost:4000/api/products?ids=$1" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['stock'])"
+          }
+          SPID=$(curl -sf "localhost:4000/api/products?limit=1" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+
+          BEFORE=$(stock_of "$SPID")
+          SORDER=$(curl -sf -X POST localhost:4000/api/orders \
+            -H 'Content-Type: application/json' \
+            -d "{\"customer_name\":\"CI Stock\",\"phone\":\"0700000001\",\"address\":\"2 Test St\",\"city\":\"Kampala\",\"items\":[{\"product_id\":\"$SPID\",\"qty\":2,\"size\":\"M\",\"color\":\"Forest\"}]}") \
+            || fail "stock-accounting order failed"
+          AFTER=$(stock_of "$SPID")
+          [ "$AFTER" = "$((BEFORE - 2))" ] || fail "stock should drop by 2 (was $BEFORE, now $AFTER)"
+
+          # Cancelling restocks exactly once
+          SOID=$(echo "$SORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['id'])")
+          curl -sf -X PATCH "localhost:4000/api/admin/orders/$SOID" \
+            -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+            -d '{"status":"cancelled"}' > /dev/null || fail "cancel failed"
+          RESTOCKED=$(stock_of "$SPID")
+          [ "$RESTOCKED" = "$BEFORE" ] || fail "cancel should restore stock to $BEFORE, got $RESTOCKED"
+
+          # A rejected multi-line order must leave stock exactly as it found it:
+          # line 1 is valid, line 2 points at a product that does not exist.
+          REJECTED=$(curl -s -o /dev/null -w "%{http_code}" -X POST localhost:4000/api/orders \
+            -H 'Content-Type: application/json' \
+            -d "{\"customer_name\":\"CI Reject\",\"phone\":\"0700000002\",\"address\":\"3 Test St\",\"city\":\"Kampala\",\"items\":[{\"product_id\":\"$SPID\",\"qty\":1,\"size\":\"M\",\"color\":\"Forest\"},{\"product_id\":\"000000000000000000000000\",\"qty\":1}]}")
+          [ "$REJECTED" = "400" ] || fail "order with a missing product should be rejected with 400, got $REJECTED"
+          UNCHANGED=$(stock_of "$SPID")
+          [ "$UNCHANGED" = "$BEFORE" ] || fail "rejected order leaked stock ($BEFORE -> $UNCHANGED)"
 
           kill $SERVER_PID
           echo "All API smoke tests passed."

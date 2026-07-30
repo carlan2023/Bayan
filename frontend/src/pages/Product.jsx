@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, fmtPrice } from "../api";
-import { useAuth, useCart } from "../store";
+import { useAuth, useCart, useConfig } from "../store";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
 import { HeartIcon, CheckIcon } from "../components/Icons";
@@ -10,6 +10,7 @@ export default function Product() {
   const { slug } = useParams();
   const { add } = useCart();
   const { user } = useAuth();
+  const { free_delivery_threshold_cents } = useConfig();
 
   const [data, setData] = useState(null);
   const [size, setSize] = useState(null);
@@ -120,7 +121,7 @@ export default function Product() {
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
           <div className="meta-line">
             {product.stock > 10 ? "In stock" : `Only ${product.stock} left`} · Cash on delivery available ·
-            Free delivery over UGX 200,000
+            Free delivery over {fmtPrice(free_delivery_threshold_cents)}
           </div>
         </div>
       </div>

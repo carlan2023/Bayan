@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
-import { AuthProvider, CartProvider } from "./store";
+import { AuthProvider, CartProvider, ConfigProvider } from "./store";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -28,31 +28,35 @@ function ShopLayout() {
   );
 }
 
+// ConfigProvider sits outside CartProvider: the cart reads the server's
+// per-line quantity cap from it to clamp quantities.
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<ShopLayout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/shop" element={<Catalog />} />
-              <Route path="/product/:slug" element={<Product />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/login" element={<Auth />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/wishlist" element={<Wishlist />} />
-            </Route>
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="products" element={<AdminProducts />} />
-              <Route path="orders" element={<AdminOrders />} />
-              <Route path="customers" element={<AdminCustomers />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+    <ConfigProvider>
+      <AuthProvider>
+        <CartProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<ShopLayout />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/shop" element={<Catalog />} />
+                <Route path="/product/:slug" element={<Product />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/login" element={<Auth />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/wishlist" element={<Wishlist />} />
+              </Route>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="products" element={<AdminProducts />} />
+                <Route path="orders" element={<AdminOrders />} />
+                <Route path="customers" element={<AdminCustomers />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </CartProvider>
+      </AuthProvider>
+    </ConfigProvider>
   );
 }

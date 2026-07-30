@@ -297,9 +297,12 @@ router.put("/products/:id", async (req, res, next) => {
     const errors = validateProduct(req.body || {});
     if (errors.length) return res.status(400).json({ error: errors.join("; ") });
 
+    // Capture the old name first: Object.assign below overwrites existing.name,
+    // so comparing against it afterwards would never detect a rename.
+    const previousName = existing.name;
     Object.assign(existing, productFields(req.body));
-    if (req.body.name.trim() !== existing.name || !existing.slug) {
-      existing.slug = await uniqueSlug(req.body.name, existing._id);
+    if (existing.name !== previousName || !existing.slug) {
+      existing.slug = await uniqueSlug(existing.name, existing._id);
     }
     await existing.save();
     res.json({ product: existing });

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 // Railway's MongoDB plugin exposes MONGO_URL; MONGODB_URI is the conventional override.
 const uri =
@@ -130,7 +131,12 @@ export async function connectDB() {
   const adminExists = await User.exists({ is_admin: true });
   if (!adminExists) {
     const email = (process.env.ADMIN_EMAIL || "admin@bayan.local").toLowerCase();
-    const password = process.env.ADMIN_PASSWORD || "admin123";
+    // "admin123" is published in the README — never use it in production. Mint a
+    // random password instead and print it once for the operator to capture.
+    const generated = !process.env.ADMIN_PASSWORD && process.env.NODE_ENV === "production";
+    const password = generated
+      ? crypto.randomBytes(12).toString("base64url")
+      : process.env.ADMIN_PASSWORD || "admin123";
     const existing = await User.findOne({ email });
     if (existing) {
       existing.is_admin = true;
@@ -143,9 +149,15 @@ export async function connectDB() {
         password_hash: bcrypt.hashSync(password, 10),
         is_admin: true,
       });
-      console.log(
-        `Created admin account: ${email} / ${password} (set ADMIN_EMAIL / ADMIN_PASSWORD env vars to override)`
-      );
+      if (generated) {
+        console.log(
+          `\n=== Created admin account: ${email}\n=== Generated password: ${password}\n=== Save it now — it is not stored anywhere and will not be shown again.\n=== Set ADMIN_PASSWORD to choose your own next time.\n`
+        );
+      } else {
+        console.log(
+          `Created admin account: ${email} / ${password} (set ADMIN_EMAIL / ADMIN_PASSWORD env vars to override)`
+        );
+      }
     }
   }
 }

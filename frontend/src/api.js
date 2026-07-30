@@ -29,7 +29,11 @@ export const api = {
     return request(`/products${qs ? "?" + qs : ""}`);
   },
   product: (slug) => request(`/products/${slug}`),
+  productsByIds: (ids) => request(`/products?ids=${ids.map(encodeURIComponent).join(",")}`),
   categories: () => request("/products/categories"),
+
+  // storefront constants (currency, delivery pricing)
+  config: () => request("/config"),
 
   // auth
   register: (body) => request("/auth/register", { method: "POST", body }),

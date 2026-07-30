@@ -2,11 +2,9 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { Product, Order, nextOrderNumber } from "../db.js";
 import { optionalAuth, requireAuth } from "../auth.js";
+import { deliveryFor, MAX_QTY_PER_LINE } from "../config.js";
 
 const router = Router();
-
-const FREE_DELIVERY_THRESHOLD = 20000000; // UGX 200,000 (stored as cents)
-const DELIVERY_FEE = 1000000; // UGX 10,000 (stored as cents)
 
 /**
  * Create an order (Cash on Delivery).
@@ -16,6 +14,15 @@ const DELIVERY_FEE = 1000000; // UGX 10,000 (stored as cents)
  * which stays correct on standalone MongoDB instances without replica-set transactions.
  */
 router.post("/", optionalAuth, async (req, res, next) => {
+  // Stock we have already taken. Every exit path below — sold out, validation
+  // error, or a throw from Order.create — must give it back, or the units are
+  // stranded: decremented from the catalogue with no order to account for them.
+  const reserved = [];
+  const release = () =>
+    Promise.all(
+      reserved.map((r) => Product.updateOne({ _id: r.product._id }, { $inc: { stock: r.qty } }))
+    );
+
   try {
     const { customer_name, phone, email, address, city, note, items } = req.body || {};
 
@@ -31,7 +38,7 @@ router.post("/", optionalAuth, async (req, res, next) => {
 
     const lines = [];
     for (const item of items) {
-      const qty = Math.max(1, Math.min(parseInt(item.qty, 10) || 1, 20));
+      const qty = Math.max(1, Math.min(parseInt(item.qty, 10) || 1, MAX_QTY_PER_LINE));
       const product = await Product.findById(item.product_id);
       if (!product) return res.status(400).json({ error: `Product ${item.product_id} not found` });
       if (product.stock < qty) {
@@ -41,23 +48,20 @@ router.post("/", optionalAuth, async (req, res, next) => {
     }
 
     // Reserve stock: conditional decrements, rolled back if any line fails
-    const reserved = [];
     for (const l of lines) {
       const updated = await Product.findOneAndUpdate(
         { _id: l.product._id, stock: { $gte: l.qty } },
         { $inc: { stock: -l.qty } }
       );
       if (!updated) {
-        await Promise.all(
-          reserved.map((r) => Product.updateOne({ _id: r.product._id }, { $inc: { stock: r.qty } }))
-        );
+        await release();
         return res.status(409).json({ error: `"${l.product.name}" just sold out — please adjust your bag` });
       }
       reserved.push(l);
     }
 
     const subtotal = lines.reduce((sum, l) => sum + l.product.price_cents * l.qty, 0);
-    const delivery = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+    const delivery = deliveryFor(subtotal);
 
     const order = await Order.create({
       number: await nextOrderNumber(),
@@ -84,6 +88,10 @@ router.post("/", optionalAuth, async (req, res, next) => {
 
     res.status(201).json({ order });
   } catch (err) {
+    // Order creation failed after stock was taken — put it back before bailing.
+    await release().catch((releaseErr) =>
+      console.error("Failed to release reserved stock after a failed order:", releaseErr)
+    );
     next(err);
   }
 });
