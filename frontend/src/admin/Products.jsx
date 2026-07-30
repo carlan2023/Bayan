@@ -160,6 +160,7 @@ export default function Products() {
         <div className="tools">
           <input
             className="input-sm"
+            aria-label="Filter products"
             placeholder="Filter products…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -186,42 +187,42 @@ export default function Products() {
           {error && <div className="alert alert-error">{error}</div>}
           <div className="form-3col">
             <div>
-              <label>Name *</label>
-              <input required value={form.name} onChange={set("name")} />
+              <label htmlFor="p-name">Name *</label>
+              <input id="p-name" required value={form.name} onChange={set("name")} />
             </div>
             <div>
-              <label>Category *</label>
-              <select value={form.category} onChange={set("category")}>
+              <label htmlFor="p-category">Category *</label>
+              <select id="p-category" value={form.category} onChange={set("category")}>
                 {CATEGORIES.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label>Fabric / material</label>
-              <input value={form.fabric} onChange={set("fabric")} placeholder="e.g. 100% linen" />
+              <label htmlFor="p-fabric">Fabric / material</label>
+              <input id="p-fabric" value={form.fabric} onChange={set("fabric")} placeholder="e.g. 100% linen" />
             </div>
           </div>
           <div className="form-3col">
             <div>
-              <label>Price (UGX) *</label>
-              <input required type="number" min="1" step="1" value={form.price} onChange={set("price")} />
+              <label htmlFor="p-price">Price (UGX) *</label>
+              <input id="p-price" required type="number" min="1" step="1" value={form.price} onChange={set("price")} />
             </div>
             <div>
-              <label>Compare-at price (UGX)</label>
-              <input type="number" min="0" step="1" value={form.compare_at} onChange={set("compare_at")} placeholder="optional — shows a Sale badge" />
+              <label htmlFor="p-compare">Compare-at price (UGX)</label>
+              <input id="p-compare" type="number" min="0" step="1" value={form.compare_at} onChange={set("compare_at")} placeholder="optional — shows a Sale badge" />
             </div>
             <div>
-              <label>Stock *</label>
-              <input required type="number" min="0" step="1" value={form.stock} onChange={set("stock")} />
+              <label htmlFor="p-stock">Stock *</label>
+              <input id="p-stock" required type="number" min="0" step="1" value={form.stock} onChange={set("stock")} />
             </div>
           </div>
           <div>
-            <label>Description *</label>
-            <textarea required rows="3" value={form.description} onChange={set("description")} />
+            <label htmlFor="p-description">Description *</label>
+            <textarea id="p-description" required rows="3" value={form.description} onChange={set("description")} />
           </div>
           <div>
-            <label>Main image (optional — defaults to the first colour's photo)</label>
+            <label htmlFor="p-image">Main image (optional — defaults to the first colour's photo)</label>
             <div className="color-row" style={{ alignItems: "flex-start", gap: 12 }}>
               {form.image ? (
                 <img
@@ -239,6 +240,7 @@ export default function Products() {
               )}
               <div style={{ flex: 1 }}>
                 <input
+                  id="p-image"
                   style={{ width: "100%" }}
                   placeholder="Paste an image URL, or upload a file →"
                   value={form.image}
@@ -263,23 +265,27 @@ export default function Products() {
           </div>
           <div className="form-3col">
             <div>
-              <label>Card swatch colour *</label>
+              <label htmlFor="p-swatch">Card swatch colour *</label>
               <div className="color-row">
-                <input type="color" value={form.swatch} onChange={set("swatch")} />
+                <input id="p-swatch" type="color" value={form.swatch} onChange={set("swatch")} />
                 <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>{form.swatch} — drives the product visual</span>
               </div>
             </div>
             <div>
-              <label>Sizes * (comma-separated)</label>
-              <input required value={form.sizes} onChange={set("sizes")} placeholder="XS, S, M, L or One size" />
+              <label htmlFor="p-sizes">Sizes * (comma-separated)</label>
+              <input id="p-sizes" required value={form.sizes} onChange={set("sizes")} placeholder="XS, S, M, L or One size" />
             </div>
             <div className="checkbox-row" style={{ alignSelf: "end", paddingBottom: 10 }}>
               <input id="featured" type="checkbox" checked={form.featured} onChange={set("featured")} />
               <label htmlFor="featured" style={{ margin: 0 }}>Featured on home page</label>
             </div>
           </div>
-          <div>
-            <label>Colour options * — upload the product photo for each colour</label>
+          {/* A <label> would be wrong here — this heading names a group of rows,
+              not one control. Each row's own inputs are labelled individually. */}
+          <div role="group" aria-labelledby="p-colors-label">
+            <span className="field-label" id="p-colors-label">
+              Colour options * — upload the product photo for each colour
+            </span>
             {form.colors.map((c, i) => (
               <div className="color-row" key={i} style={{ alignItems: "center" }}>
                 {c.image ? (
@@ -296,10 +302,16 @@ export default function Products() {
                     title="No photo yet for this colour"
                   />
                 )}
-                <input type="color" value={c.hex} onChange={(e) => setColor(i, "hex", e.target.value)} />
+                <input
+                  type="color"
+                  aria-label={`Colour ${i + 1} swatch`}
+                  value={c.hex}
+                  onChange={(e) => setColor(i, "hex", e.target.value)}
+                />
                 <input
                   className="input-sm"
                   style={{ flex: 1 }}
+                  aria-label={`Colour ${i + 1} name`}
                   placeholder="Colour name, e.g. Forest"
                   value={c.name}
                   onChange={(e) => setColor(i, "name", e.target.value)}
@@ -318,6 +330,7 @@ export default function Products() {
                   <button
                     type="button"
                     className="link-btn"
+                    aria-label={`Remove colour ${c.name || i + 1}`}
                     onClick={() => setForm((f) => ({ ...f, colors: f.colors.filter((_, idx) => idx !== i) }))}
                   >
                     Remove
@@ -356,7 +369,8 @@ export default function Products() {
         {!shown ? (
           <div className="spinner">Loading…</div>
         ) : (
-          <table className="admin-table">
+          <div className="table-scroll">
+            <table className="admin-table">
             <thead>
               <tr>
                 <th>Product</th>
@@ -401,7 +415,8 @@ export default function Products() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </>

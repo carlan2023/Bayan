@@ -61,6 +61,15 @@
 .admin-panel h3 span { font-weight: 300; color: var(--ink-soft); font-size: 0.85rem; }
 
 /* Tables */
+/* Wide tables (Orders runs to 8 columns) scroll inside their own container
+   rather than pushing the page sideways on narrow screens. The min-width floor
+   is mobile-only — on desktop these tables should just fill their panel, and a
+   floor would put a scrollbar on the narrow right-hand dashboard panels. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 760px) {
+  .table-scroll > .admin-table { min-width: 620px; }
+}
+
 .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .admin-table th {
   text-align: left;

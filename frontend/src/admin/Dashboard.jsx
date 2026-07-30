@@ -85,20 +85,22 @@ export default function Dashboard() {
           {top_products.length === 0 ? (
             <div className="empty-mini">No sales yet — top sellers will appear here.</div>
           ) : (
-            <table className="admin-table">
-              <thead>
-                <tr><th>Product</th><th className="num">Units</th><th className="num">Revenue</th></tr>
-              </thead>
-              <tbody>
-                {top_products.map((p) => (
-                  <tr key={p.product_id}>
-                    <td>{p.name}</td>
-                    <td className="num">{p.units}</td>
-                    <td className="num">{fmtPrice(p.revenue_cents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Product</th><th className="num">Units</th><th className="num">Revenue</th></tr>
+                </thead>
+                <tbody>
+                  {top_products.map((p) => (
+                    <tr key={p.product_id}>
+                      <td>{p.name}</td>
+                      <td className="num">{p.units}</td>
+                      <td className="num">{fmtPrice(p.revenue_cents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
         <div className="admin-panel">
@@ -120,22 +122,24 @@ export default function Dashboard() {
           {recent_orders.length === 0 ? (
             <div className="empty-mini">No orders yet.</div>
           ) : (
-            <table className="admin-table">
-              <thead>
-                <tr><th>#</th><th>Customer</th><th>City</th><th>Status</th><th className="num">Total</th></tr>
-              </thead>
-              <tbody>
-                {recent_orders.map((o) => (
-                  <tr key={o.id}>
-                    <td>{o.number}</td>
-                    <td>{o.customer_name}</td>
-                    <td>{o.city}</td>
-                    <td><span className={`chip ${o.status}`}>{o.status}</span></td>
-                    <td className="num">{fmtPrice(o.total_cents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>#</th><th>Customer</th><th>City</th><th>Status</th><th className="num">Total</th></tr>
+                </thead>
+                <tbody>
+                  {recent_orders.map((o) => (
+                    <tr key={o.id}>
+                      <td>{o.number}</td>
+                      <td>{o.customer_name}</td>
+                      <td>{o.city}</td>
+                      <td><span className={`chip ${o.status}`}>{o.status}</span></td>
+                      <td className="num">{fmtPrice(o.total_cents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           <div style={{ marginTop: 10 }}>
             <Link to="/admin/orders" className="link-btn">Manage all orders →</Link>
@@ -146,20 +150,22 @@ export default function Dashboard() {
           {low_stock.length === 0 ? (
             <div className="empty-mini">All products are well stocked.</div>
           ) : (
-            <table className="admin-table">
-              <thead>
-                <tr><th>Product</th><th>Category</th><th className="num">Stock</th></tr>
-              </thead>
-              <tbody>
-                {low_stock.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td>{p.category}</td>
-                    <td className="num" style={{ color: p.stock === 0 ? "var(--danger)" : "inherit" }}>{p.stock}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Product</th><th>Category</th><th className="num">Stock</th></tr>
+                </thead>
+                <tbody>
+                  {low_stock.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.name}</td>
+                      <td>{p.category}</td>
+                      <td className="num" style={{ color: p.stock === 0 ? "var(--danger)" : "inherit" }}>{p.stock}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

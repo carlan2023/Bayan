@@ -105,30 +105,75 @@ export default function Checkout() {
 
           <div className="two-col">
             <div>
-              <label>Full name *</label>
-              <input required value={form.customer_name} onChange={set("customer_name")} />
+              <label htmlFor="co-name">Full name *</label>
+              <input
+                id="co-name"
+                name="name"
+                autoComplete="name"
+                required
+                value={form.customer_name}
+                onChange={set("customer_name")}
+              />
             </div>
             <div>
-              <label>Phone *</label>
-              <input required type="tel" placeholder="07XX XXX XXX" value={form.phone} onChange={set("phone")} />
+              <label htmlFor="co-phone">Phone *</label>
+              <input
+                id="co-phone"
+                name="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                required
+                type="tel"
+                placeholder="07XX XXX XXX"
+                value={form.phone}
+                onChange={set("phone")}
+              />
             </div>
           </div>
           <div>
-            <label>Email</label>
-            <input type="email" value={form.email} onChange={set("email")} />
+            <label htmlFor="co-email">Email</label>
+            <input
+              id="co-email"
+              name="email"
+              autoComplete="email"
+              inputMode="email"
+              type="email"
+              value={form.email}
+              onChange={set("email")}
+            />
           </div>
           <div>
-            <label>Delivery address *</label>
-            <input required placeholder="Street, building, apartment" value={form.address} onChange={set("address")} />
+            <label htmlFor="co-address">Delivery address *</label>
+            <input
+              id="co-address"
+              name="street-address"
+              autoComplete="street-address"
+              required
+              placeholder="Street, building, apartment"
+              value={form.address}
+              onChange={set("address")}
+            />
           </div>
           <div className="two-col">
             <div>
-              <label>City / town *</label>
-              <input required value={form.city} onChange={set("city")} />
+              <label htmlFor="co-city">City / town *</label>
+              <input
+                id="co-city"
+                name="address-level2"
+                autoComplete="address-level2"
+                required
+                value={form.city}
+                onChange={set("city")}
+              />
             </div>
             <div>
-              <label>Delivery note</label>
-              <input placeholder="e.g. call on arrival" value={form.note} onChange={set("note")} />
+              <label htmlFor="co-note">Delivery note</label>
+              <input
+                id="co-note"
+                placeholder="e.g. call on arrival"
+                value={form.note}
+                onChange={set("note")}
+              />
             </div>
           </div>
 

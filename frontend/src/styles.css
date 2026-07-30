@@ -124,6 +124,96 @@ img, svg { display: block; max-width: 100%; }
 
 .btn-icon { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
+/* ---------- Header: mobile ----------
+   The hamburger, magnifier, search row and drawer exist only below the
+   breakpoint; on desktop the inline nav and search field carry the same
+   functions, so these stay display:none regardless of component state. */
+.hamburger,
+.search-toggle,
+.mobile-search,
+.mobile-nav,
+.scrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .header-inner { gap: 10px; padding: 12px 0; }
+  .logo { font-size: 1.5rem; }
+
+  /* Inline nav + search field give way to the drawer and the magnifier. */
+  .nav,
+  .search-form,
+  .header-actions .desktop-only { display: none; }
+
+  .hamburger,
+  .search-toggle { display: inline-flex; }
+  .hamburger { margin-right: 2px; padding: 6px; }
+
+  /* Logo takes the middle, actions stay pinned right. */
+  .header-actions { gap: 10px; }
+  .icon-btn { padding: 6px 4px; }
+
+  .mobile-search {
+    display: block;
+    border-top: 1px solid var(--line);
+    padding: 12px 0;
+    background: var(--surface);
+  }
+  .mobile-search input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 11px 18px;
+    background: var(--bg);
+    outline: none;
+  }
+  .mobile-search input:focus { border-color: var(--pine); }
+
+  .mobile-nav {
+    display: block;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    position: relative;
+    z-index: 60;
+  }
+  .mobile-nav nav { display: flex; flex-direction: column; padding: 8px 24px 20px; }
+  .mobile-nav a,
+  .mobile-nav button {
+    text-align: left;
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--ink);
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .mobile-nav a.active { color: var(--pine); font-weight: 500; }
+  .mobile-nav .mobile-nav-foot { display: flex; flex-direction: column; margin-top: 8px; }
+  .mobile-nav .mobile-nav-foot a,
+  .mobile-nav .mobile-nav-foot button { color: var(--ink-soft); font-size: 0.94rem; }
+  .mobile-nav .mobile-nav-foot :last-child { border-bottom: none; }
+
+  /* Dim the page behind the drawer; tapping it closes. */
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(31, 42, 36, 0.38);
+    z-index: 40;
+  }
+}
+
+/* Coarse pointers need a bigger hit area than the 0.85rem text implies. */
+@media (max-width: 900px) and (pointer: coarse) {
+  .icon-btn,
+  .hamburger,
+  .search-toggle { min-width: 44px; min-height: 44px; justify-content: center; }
+}
+
 .cart-count {
   position: absolute;
   top: -8px;
@@ -321,7 +411,10 @@ select.pill { appearance: none; padding-right: 28px; }
 .link-btn { background: none; border: none; color: var(--clay-dark); font-size: 0.85rem; text-decoration: underline; }
 
 .form-grid { display: grid; gap: 16px; }
-.form-grid label { display: block; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
+/* .field-label styles a heading for a group of controls, where a <label> would
+   be wrong because it labels no single input (see the colour editor). */
+.form-grid label,
+.form-grid .field-label { display: block; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
 .form-grid input, .form-grid textarea, .form-grid select {
   width: 100%;
   border: 1px solid var(--line);

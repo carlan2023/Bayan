@@ -52,7 +52,8 @@ export default function Orders() {
         ) : orders.length === 0 ? (
           <div className="empty-mini">No orders{filter ? ` with status "${filter}"` : " yet"}.</div>
         ) : (
-          <table className="admin-table">
+          <div className="table-scroll">
+            <table className="admin-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -127,7 +128,8 @@ export default function Orders() {
                 </>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </>

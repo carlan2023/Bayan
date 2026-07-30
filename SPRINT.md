@@ -22,13 +22,16 @@ Highest risk; everything else is cosmetic next to a wrong order total. The secre
 
 **Not covered by tests:** the `release()` compensation inside the reservation loop only fires when a guarded `$inc` loses a race, which needs concurrency to reproduce — CI asserts the invariant via the validation path instead. Untested against a live DB locally (no MongoDB/Docker on this machine); the CI job with the `mongo:7` service container is the real verification.
 
-## Milestone 2 — Mobile shell
+## Milestone 2 — Mobile shell ✅
 
 The store is currently unusable on a phone. For a cash-on-delivery store in Uganda this is where nearly all traffic is.
 
-- [ ] **Header overflows on mobile.** `components/Header.jsx` renders logo + 4 nav links + search + up to 5 action buttons in a single flex row, and `styles.css` has zero media queries for `.header`, `.nav`, `.search-form`, or `.header-actions` (the only breakpoints are lines 208-209, 278, 335-338, 368 — grids and forms only). Below ~700px the header overflows horizontally. Add a hamburger drawer, collapse search to an icon-triggered overlay, keep only bag + wishlist visible.
-- [ ] **Form labels are not associated with their inputs** anywhere — `Checkout.jsx:92,96,101,105,110,114`, `Auth.jsx:38,43,47`, and throughout `admin/Products.jsx` all use bare `<label>Text</label><input/>`. Screen readers announce nothing and tapping the label doesn't focus the field. Add `htmlFor`/`id` pairs.
-- [ ] **Admin tables break the mobile layout.** `admin.css:127` collapses the sidebar at 760px but `.admin-table` has no scroll container — the 8-column Orders table overflows. Wrap tables in `overflow-x: auto`.
+- [x] **Header overflows on mobile.** `components/Header.jsx` renders logo + 4 nav links + search + up to 5 action buttons in a single flex row, and `styles.css` has zero media queries for `.header`, `.nav`, `.search-form`, or `.header-actions`. → Hamburger drawer + magnifier-triggered search row below 900px; departments and the account actions move into the drawer, bag and wishlist stay in the bar. Drawer closes on route change and on Escape, locks body scroll, dims the page behind a tappable scrim, and focuses the search field when opened. New `MenuIcon` / `CloseIcon` / `SearchIcon`.
+- [x] **Form labels are not associated with their inputs** anywhere — `Checkout.jsx`, `Auth.jsx`, and throughout `admin/Products.jsx` used bare `<label>Text</label><input/>`. → `htmlFor`/`id` pairs throughout. Also added `autoComplete` and `inputMode` on checkout and auth fields (phone/email keyboards on mobile, password-manager support), `aria-label`s on the repeated colour-editor rows, and a `.field-label` group heading with `role="group"`/`aria-labelledby` where a `<label>` would have been semantically wrong.
+- [x] **Admin tables break the mobile layout.** `admin.css:127` collapses the sidebar at 760px but `.admin-table` had no scroll container — the 8-column Orders table overflowed. → `.table-scroll` wrapper on all six admin tables. The `min-width` floor is scoped to ≤760px so the narrow dashboard panels don't get scrollbars on desktop.
+- [x] 44px minimum hit targets for header controls under `(pointer: coarse)`.
+
+**Not verified visually:** the Chrome extension isn't connected in this session, so the breakpoint behaviour has not been seen rendered — only the build, the CSS cascade order (`.hamburger`/`.search-toggle` correctly override `.icon-btn`'s `display: inline-flex` in both directions), and a full audit that every `<label>` now resolves to a control. Worth a look on a real phone before it ships.
 
 ## Milestone 3 — Resilience: no more dead-end screens
 

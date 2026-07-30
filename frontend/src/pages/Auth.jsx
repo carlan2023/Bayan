@@ -35,17 +35,35 @@ export default function Auth() {
         {error && <div className="alert alert-error">{error}</div>}
         {mode === "register" && (
           <div>
-            <label>Full name</label>
-            <input required value={form.name} onChange={set("name")} />
+            <label htmlFor="auth-name">Full name</label>
+            <input id="auth-name" name="name" autoComplete="name" required value={form.name} onChange={set("name")} />
           </div>
         )}
         <div>
-          <label>Email</label>
-          <input required type="email" value={form.email} onChange={set("email")} />
+          <label htmlFor="auth-email">Email</label>
+          <input
+            id="auth-email"
+            name="email"
+            autoComplete="email"
+            inputMode="email"
+            required
+            type="email"
+            value={form.email}
+            onChange={set("email")}
+          />
         </div>
         <div>
-          <label>Password</label>
-          <input required type="password" minLength={6} value={form.password} onChange={set("password")} />
+          <label htmlFor="auth-password">Password</label>
+          <input
+            id="auth-password"
+            name="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            required
+            type="password"
+            minLength={6}
+            value={form.password}
+            onChange={set("password")}
+          />
         </div>
         <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}

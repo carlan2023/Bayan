@@ -24,7 +24,8 @@ export default function Customers() {
         ) : customers.length === 0 ? (
           <div className="empty-mini">No registered customers yet. Guest orders appear under Orders.</div>
         ) : (
-          <table className="admin-table">
+          <div className="table-scroll">
+            <table className="admin-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -45,7 +46,8 @@ export default function Customers() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </>
