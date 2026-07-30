@@ -30,6 +30,11 @@ app.use("/api/admin", adminRoutes);
 // Uploaded product images (persisted on a volume in production).
 app.use("/uploads", express.static(UPLOAD_DIR));
 
+// Unknown /api routes must answer in JSON. Without this they fell through to
+// Express's default HTML 404, which the client then failed to parse, surfacing
+// a confusing "Request failed (404)" instead of the real problem.
+app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint not found" }));
+
 // In production (e.g. Railway) serve the built frontend from the same service,
 // so the SPA and API share one origin and no CORS/proxy config is needed.
 const distDir = process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist");

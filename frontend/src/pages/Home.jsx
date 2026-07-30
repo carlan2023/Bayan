@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fmtPrice } from "../api";
 import { useConfig } from "../store";
+import { useAsync } from "../useAsync";
 import ProductCard from "../components/ProductCard";
+import ErrorState from "../components/ErrorState";
 
 const CAT_COLORS = {
   Women: "linear-gradient(135deg, #2e4b3f, #4a6b5a)",
@@ -13,15 +14,18 @@ const CAT_COLORS = {
 
 export default function Home() {
   const { free_delivery_threshold_cents, delivery_fee_cents } = useConfig();
-  const [featured, setFeatured] = useState([]);
-  const [cats, setCats] = useState([]);
 
-  useEffect(() => {
-    api
-      .products({ featured: 1, limit: 8 })
-      .then((d) => setFeatured(d.products));
-    api.categories().then((d) => setCats(d.categories));
-  }, []);
+  // One fetch for both strips: if either fails the page says so instead of
+  // silently rendering empty grids under their headings.
+  const { data, error, loading, reload } = useAsync(
+    () =>
+      Promise.all([api.products({ featured: 1, limit: 8 }), api.categories()]).then(
+        ([f, c]) => ({ featured: f.products, cats: c.categories })
+      ),
+    []
+  );
+  const featured = data?.featured ?? [];
+  const cats = data?.cats ?? [];
 
   return (
     <>
@@ -41,36 +45,52 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="section container">
-        <div className="section-head">
-          <h2>Shop by department</h2>
-        </div>
-        <div className="grid-cats">
-          {cats.map((c) => (
-            <Link
-              key={c.category}
-              to={`/shop?category=${c.category}`}
-              className="cat-card"
-              style={{ background: CAT_COLORS[c.category] || CAT_COLORS.Accessories }}
-            >
-              <h3>{c.category}</h3>
-              <span>{c.count} pieces</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {error ? (
+        <section className="section container">
+          <ErrorState
+            title="We couldn't load the collection"
+            message={error}
+            onRetry={reload}
+          />
+        </section>
+      ) : loading ? (
+        <div className="spinner">Loading…</div>
+      ) : (
+        <>
+          <section className="section container">
+            <div className="section-head">
+              <h2>Shop by department</h2>
+            </div>
+            <div className="grid-cats">
+              {cats.map((c) => (
+                <Link
+                  key={c.category}
+                  to={`/shop?category=${c.category}`}
+                  className="cat-card"
+                  style={{ background: CAT_COLORS[c.category] || CAT_COLORS.Accessories }}
+                >
+                  <h3>{c.category}</h3>
+                  <span>{c.count} pieces</span>
+                </Link>
+              ))}
+            </div>
+          </section>
 
-      <section className="section container">
-        <div className="section-head">
-          <h2>Featured this week</h2>
-          <Link to="/shop">View all</Link>
-        </div>
-        <div className="grid">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
+          {featured.length > 0 && (
+            <section className="section container">
+              <div className="section-head">
+                <h2>Featured this week</h2>
+                <Link to="/shop">View all</Link>
+              </div>
+              <div className="grid">
+                {featured.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       <section className="section container">
         <div className="perks">

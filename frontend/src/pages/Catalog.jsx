@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { useAsync } from "../useAsync";
 import ProductCard from "../components/ProductCard";
+import ErrorState from "../components/ErrorState";
 
 const SORTS = [
   ["newest", "Newest"],
@@ -16,17 +17,18 @@ export default function Catalog() {
   const search = params.get("search") || "";
   const sort = params.get("sort") || "newest";
 
-  const [products, setProducts] = useState(null);
-  const [cats, setCats] = useState([]);
+  // Filter pills are non-critical chrome — if they fail to load the grid still
+  // works, so this failure stays silent rather than blocking the page.
+  const { data: catData } = useAsync(() => api.categories(), []);
+  const cats = catData?.categories ?? [];
 
-  useEffect(() => {
-    api.categories().then((d) => setCats(d.categories));
-  }, []);
-
-  useEffect(() => {
-    setProducts(null);
-    api.products({ category, search, sort }).then((d) => setProducts(d.products));
-  }, [category, search, sort]);
+  const {
+    data: productData,
+    error,
+    loading,
+    reload,
+  } = useAsync(() => api.products({ category, search, sort }), [category, search, sort]);
+  const products = productData?.products ?? null;
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);
@@ -68,7 +70,9 @@ export default function Catalog() {
         </select>
       </div>
 
-      {!products ? (
+      {error ? (
+        <ErrorState message={error} onRetry={reload} />
+      ) : loading || !products ? (
         <div className="spinner">Loading…</div>
       ) : products.length === 0 ? (
         <div className="empty">

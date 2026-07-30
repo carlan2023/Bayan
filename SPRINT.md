@@ -33,15 +33,19 @@ The store is currently unusable on a phone. For a cash-on-delivery store in Ugan
 
 **Not verified visually:** the Chrome extension isn't connected in this session, so the breakpoint behaviour has not been seen rendered — only the build, the CSS cascade order (`.hamburger`/`.search-toggle` correctly override `.icon-btn`'s `display: inline-flex` in both directions), and a full audit that every `<label>` now resolves to a control. Worth a look on a real phone before it ships.
 
-## Milestone 3 — Resilience: no more dead-end screens
+## Milestone 3 — Resilience: no more dead-end screens ✅
 
 Small diffs, disproportionate UX payoff.
 
-- [ ] **Unhandled rejections leave permanent spinners.** `Product.jsx:26`, `Catalog.jsx:28`, and `Home.jsx:18-21` call `api.*(...).then(...)` with no `.catch`. A 404 slug or dropped connection leaves "Loading…" on screen forever. Add error state + retry.
-- [ ] **No catch-all route.** `App.jsx:36-53` defines no `path="*"`, so any typo'd URL renders a completely blank white page — not even the header. Add a 404 page inside `ShopLayout`.
-- [ ] **Unknown API routes return HTML.** `server.js:34-37` passes `/api/*` to Express's default 404 handler, which emits HTML; `api.js:18` then fails to parse it. Add a JSON 404 for `/api/*` before the SPA fallback.
-- [ ] **Wishlist state is write-only.** `Product.jsx:18` tracks `wished` locally only — revisiting a saved product shows "Wishlist", not "Saved", and there's no heart affordance on `ProductCard`. Lift the wishlist into a context alongside cart.
-- [ ] **Cart quantity has no ceiling.** `Cart.jsx:51` increments without bound while `orders.js:34` silently clamps to 20 and the stock check rejects at checkout.
+- [x] **Unhandled rejections leave permanent spinners.** `Product.jsx`, `Catalog.jsx` and `Home.jsx` called `api.*(...).then(...)` with no `.catch`, so a 404 slug or dropped connection left "Loading…" on screen forever. → New `useAsync` hook tracks `{ data, error, loading, reload }` and discards stale responses; new `ErrorState` component always offers a retry. Applied to Home, Catalog, Product, Account and Wishlist.
+- [x] **Silent failures misreported as empty.** `Account.jsx` and `Wishlist.jsx` caught errors into `[]`, so a network failure was indistinguishable from having no orders / nothing saved. → Both now distinguish error from empty.
+- [x] **No catch-all route.** `App.jsx` defined no `path="*"`, so a typo'd URL rendered a blank white page with no header. → New `NotFound` page inside `ShopLayout`.
+- [x] **Unknown API routes return HTML.** `/api/*` fell through to Express's default HTML 404, which `api.js` then failed to parse. → JSON 404 registered before the SPA fallback, asserted in CI.
+- [x] **Wishlist state is write-only.** `Product.jsx` tracked `wished` locally, so revisiting a saved product showed "Wishlist" rather than "Saved", and cards had no affordance at all. → New `WishlistProvider` with optimistic `toggle` that rolls back on server rejection; heart button added to `ProductCard`, sitting outside the `<Link>` since a `<button>` inside an `<a>` is invalid markup.
+- [x] **Cart quantity has no ceiling** — done in the previous batch.
+- [x] *Found while working:* a sold-out product could still be added to the bag and only failed at checkout. Now the button reads "Out of stock" and is disabled, and `cart.add()` refuses a zero-stock line. (The earlier `Math.max(1, …)` clamp forced a quantity of 1 even at zero stock.)
+
+**Not verified visually** — same constraint as the mobile shell: build and static review only, no rendered check of the heart button, error screens or 404 page.
 
 ## Milestone 4 — Admin at scale
 

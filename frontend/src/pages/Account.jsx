@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api, fmtPrice } from "../api";
 import { useAuth } from "../store";
+import { useAsync } from "../useAsync";
+import ErrorState from "../components/ErrorState";
 
 export default function Account() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState(null);
-
-  useEffect(() => {
-    if (user) api.myOrders().then((d) => setOrders(d.orders)).catch(() => setOrders([]));
-  }, [user]);
+  // Previously a failed fetch was swallowed into an empty array, so a network
+  // error was indistinguishable from genuinely having no orders.
+  const { data, error, loading, reload } = useAsync(
+    () => (user ? api.myOrders() : Promise.resolve({ orders: [] })),
+    [user?.id]
+  );
+  const orders = data?.orders ?? null;
 
   if (!user) return <Navigate to="/login" replace />;
 
@@ -21,7 +24,9 @@ export default function Account() {
       </div>
 
       <h2 style={{ margin: "16px 0" }}>Order history</h2>
-      {!orders ? (
+      {error ? (
+        <ErrorState title="We couldn't load your orders" message={error} onRetry={reload} />
+      ) : loading || !orders ? (
         <div className="spinner">Loading…</div>
       ) : orders.length === 0 ? (
         <div className="empty">

@@ -83,6 +83,60 @@ export function AuthProvider({ children }) {
 }
 export const useAuth = () => useContext(AuthContext);
 
+/* ---------------- Wishlist ---------------- */
+const WishlistContext = createContext(null);
+
+/**
+ * Which products the signed-in user has saved. Previously each Product page
+ * tracked a local `wished` boolean, so returning to a saved item showed
+ * "Wishlist" rather than "Saved" and cards had no way to show the state at all.
+ * Must sit inside AuthProvider — it reloads whenever the account changes.
+ */
+export function WishlistProvider({ children }) {
+  const { user } = useAuth();
+  const [ids, setIds] = useState([]);
+
+  useEffect(() => {
+    if (!user) {
+      setIds([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .wishlist()
+      .then(({ products }) => {
+        if (!cancelled) setIds(products.map((p) => p.id));
+      })
+      .catch(() => {
+        if (!cancelled) setIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const value = {
+    ids,
+    has: (id) => ids.includes(id),
+    /** Optimistic add/remove; rolls back and rethrows if the server rejects. */
+    async toggle(id) {
+      if (!user) throw new Error("Sign in to save items to your wishlist.");
+      const wasSaved = ids.includes(id);
+      setIds((prev) => (wasSaved ? prev.filter((x) => x !== id) : [...prev, id]));
+      try {
+        if (wasSaved) await api.removeWish(id);
+        else await api.addWish(id);
+      } catch (err) {
+        setIds((prev) => (wasSaved ? [...prev, id] : prev.filter((x) => x !== id)));
+        throw err;
+      }
+      return !wasSaved;
+    },
+  };
+  return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
+}
+export const useWishlist = () => useContext(WishlistContext);
+
 /* ---------------- Cart ---------------- */
 const CartContext = createContext(null);
 
@@ -175,7 +229,8 @@ export function CartProvider({ children }) {
         const k = keyOf(entry);
         // Never let a line exceed stock or the server's per-line cap — the
         // order endpoint silently clamps, which would surprise the shopper.
-        const cap = Math.max(1, Math.min(product.stock ?? max_qty_per_line, max_qty_per_line));
+        const cap = Math.min(product.stock ?? max_qty_per_line, max_qty_per_line);
+        if (cap <= 0) return prev; // sold out — adding it would only fail at checkout
         const existing = prev.find((i) => keyOf(i) === k);
         if (existing) {
           // Refresh the line's product data while we have it fresh from the API.

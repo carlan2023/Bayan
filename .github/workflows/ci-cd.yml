@@ -68,6 +68,12 @@ jobs:
           # storefront config — the client quotes totals from these
           curl -sf localhost:4000/api/config | grep -q '"free_delivery_threshold_cents"' || fail "config endpoint failed"
 
+          # unknown /api routes answer in JSON, not Express's default HTML 404
+          NF=$(curl -s -o /dev/null -w "%{http_code}" localhost:4000/api/does-not-exist)
+          [ "$NF" = "404" ] || fail "unknown /api route returned $NF, expected 404"
+          curl -s localhost:4000/api/does-not-exist | grep -q '"error"' \
+            || fail "unknown /api route did not return a JSON error body"
+
           # bulk lookup by id (used by the cart to re-price its lines)
           IDS_PID=$(curl -sf "localhost:4000/api/products?limit=1" \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")

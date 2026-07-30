@@ -1,39 +1,59 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api, fmtPrice } from "../api";
-import { useAuth, useCart, useConfig } from "../store";
+import { useCart, useConfig, useWishlist } from "../store";
+import { useAsync } from "../useAsync";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
+import ErrorState from "../components/ErrorState";
 import { HeartIcon, CheckIcon } from "../components/Icons";
 
 export default function Product() {
   const { slug } = useParams();
   const { add } = useCart();
-  const { user } = useAuth();
+  const { has, toggle } = useWishlist();
   const { free_delivery_threshold_cents } = useConfig();
 
-  const [data, setData] = useState(null);
+  const { data, error: loadError, loading, reload } = useAsync(() => api.product(slug), [slug]);
+
   const [size, setSize] = useState(null);
   const [color, setColor] = useState(null);
   const [added, setAdded] = useState(false);
-  const [wished, setWished] = useState(false);
-  const [error, setError] = useState("");
+  // Kept separate from loadError: this one is for validation and wishlist
+  // failures, which must not replace the whole page with an error screen.
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    setData(null);
-    setAdded(false);
-    setWished(false);
-    setError("");
-    api.product(slug).then((d) => {
-      setData(d);
-      setSize(d.product.sizes.length === 1 ? d.product.sizes[0] : null);
-      setColor(d.product.colors[0]?.name || null);
-    });
     window.scrollTo(0, 0);
+    setAdded(false);
+    setFormError("");
   }, [slug]);
 
-  if (!data) return <div className="spinner">Loading…</div>;
+  // Default the options once the product arrives.
+  useEffect(() => {
+    if (!data?.product) return;
+    setSize(data.product.sizes.length === 1 ? data.product.sizes[0] : null);
+    setColor(data.product.colors[0]?.name || null);
+  }, [data]);
+
+  if (loading) return <div className="spinner">Loading…</div>;
+
+  if (loadError) {
+    return (
+      <div className="container">
+        <ErrorState title="We couldn't load this product" message={loadError} onRetry={reload}>
+          <Link to="/shop" className="btn btn-ghost">
+            Browse products
+          </Link>
+        </ErrorState>
+      </div>
+    );
+  }
+
   const { product, related } = data;
+  const wished = has(product.id);
+  // Adding a sold-out item used to succeed and only fail at checkout.
+  const soldOut = product.stock <= 0;
 
   // Show the photo for the chosen colour, falling back to the product's main image.
   const activeColor = product.colors.find((c) => c.name === color);
@@ -41,25 +61,21 @@ export default function Product() {
 
   function addToBag() {
     if (!size) {
-      setError("Please choose a size first.");
+      setFormError("Please choose a size first.");
       return;
     }
-    setError("");
+    setFormError("");
     add(product, { size, color });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
 
-  async function addToWishlist() {
-    if (!user) {
-      setError("Sign in to save items to your wishlist.");
-      return;
-    }
+  async function toggleWishlist() {
+    setFormError("");
     try {
-      await api.addWish(product.id);
-      setWished(true);
+      await toggle(product.id);
     } catch (e) {
-      setError(e.message);
+      setFormError(e.message);
     }
   }
 
@@ -84,6 +100,7 @@ export default function Product() {
               <button
                 key={c.name}
                 className={`opt color-opt ${color === c.name ? "active" : ""}`}
+                aria-pressed={color === c.name}
                 onClick={() => setColor(c.name)}
               >
                 <span className="swatch-dot" style={{ background: c.hex }} />
@@ -95,17 +112,24 @@ export default function Product() {
           <div className="opt-label">Size</div>
           <div className="opt-row">
             {product.sizes.map((s) => (
-              <button key={s} className={`opt ${size === s ? "active" : ""}`} onClick={() => setSize(s)}>
+              <button
+                key={s}
+                className={`opt ${size === s ? "active" : ""}`}
+                aria-pressed={size === s}
+                onClick={() => setSize(s)}
+              >
                 {s}
               </button>
             ))}
           </div>
 
-          {error && <div className="alert alert-error">{error}</div>}
+          {formError && <div className="alert alert-error">{formError}</div>}
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-primary btn-icon" onClick={addToBag}>
-              {added ? (
+            <button className="btn btn-primary btn-icon" onClick={addToBag} disabled={soldOut}>
+              {soldOut ? (
+                "Out of stock"
+              ) : added ? (
                 <>
                   Added <CheckIcon size={16} />
                 </>
@@ -113,15 +137,19 @@ export default function Product() {
                 "Add to bag"
               )}
             </button>
-            <button className="btn btn-ghost btn-icon" onClick={addToWishlist}>
+            <button
+              className="btn btn-ghost btn-icon"
+              onClick={toggleWishlist}
+              aria-pressed={wished}
+            >
               {wished ? "Saved" : "Wishlist"} <HeartIcon size={16} filled={wished} />
             </button>
           </div>
 
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
           <div className="meta-line">
-            {product.stock > 10 ? "In stock" : `Only ${product.stock} left`} · Cash on delivery available ·
-            Free delivery over {fmtPrice(free_delivery_threshold_cents)}
+            {soldOut ? "Out of stock" : product.stock > 10 ? "In stock" : `Only ${product.stock} left`} ·
+            Cash on delivery available · Free delivery over {fmtPrice(free_delivery_threshold_cents)}
           </div>
         </div>
       </div>
