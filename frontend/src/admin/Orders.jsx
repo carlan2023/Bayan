@@ -1,21 +1,46 @@
-import { useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api, fmtPrice } from "../api";
+import Pager from "./Pager";
 
 const STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
+const PAGE_SIZE = 25;
 
 export default function Orders() {
-  const [orders, setOrders] = useState(null);
   const [filter, setFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
   const [open, setOpen] = useState(null);
   const [error, setError] = useState("");
 
-  const load = (status = filter) =>
-    api.admin.orders(status).then((d) => setOrders(d.orders)).catch((e) => setError(e.message));
+  const load = useCallback(
+    () =>
+      api.admin
+        .orders({ status: filter, search: query, page, limit: PAGE_SIZE })
+        .then(setResult)
+        .catch((e) => setError(e.message)),
+    [filter, query, page]
+  );
 
   useEffect(() => {
-    setOrders(null);
-    load(filter);
-  }, [filter]);
+    load();
+  }, [load]);
+
+  // Debounce typing so each keystroke isn't a request.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQuery(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const orders = result?.orders ?? null;
+
+  useEffect(() => {
+    if (result && result.page > result.pages) setPage(result.pages);
+  }, [result]);
 
   async function setStatus(order, status) {
     setError("");
@@ -32,16 +57,40 @@ export default function Orders() {
       <div className="admin-head">
         <div>
           <h1>Orders</h1>
-          <p>{orders ? `${orders.length} shown` : "Loading…"}</p>
+          <p>{result ? `${result.total} matching` : "Loading…"}</p>
         </div>
-        <div className="pill-row">
-          <button className={`pill ${!filter ? "active" : ""}`} onClick={() => setFilter("")}>All</button>
-          {STATUSES.map((s) => (
-            <button key={s} className={`pill ${filter === s ? "active" : ""}`} onClick={() => setFilter(s)}>
-              {s}
-            </button>
-          ))}
+        <div className="tools">
+          <input
+            className="input-sm"
+            aria-label="Search orders"
+            placeholder="Order #, name, phone, town…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+      </div>
+      <div className="pill-row" style={{ marginBottom: 18 }}>
+        <button
+          className={`pill ${!filter ? "active" : ""}`}
+          onClick={() => {
+            setFilter("");
+            setPage(1);
+          }}
+        >
+          All
+        </button>
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            className={`pill ${filter === s ? "active" : ""}`}
+            onClick={() => {
+              setFilter(s);
+              setPage(1);
+            }}
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -50,7 +99,11 @@ export default function Orders() {
         {!orders ? (
           <div className="spinner">Loading…</div>
         ) : orders.length === 0 ? (
-          <div className="empty-mini">No orders{filter ? ` with status "${filter}"` : " yet"}.</div>
+          <div className="empty-mini">
+            No orders{filter ? ` with status "${filter}"` : ""}
+            {query ? ` matching “${query}”` : ""}
+            {!filter && !query ? " yet" : ""}.
+          </div>
         ) : (
           <div className="table-scroll">
             <table className="admin-table">
@@ -68,8 +121,11 @@ export default function Orders() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <>
-                  <tr key={o.id}>
+                // Shorthand <> cannot carry a key, so the key on the inner <tr>
+                // was not the list child's key — React warned and mis-matched
+                // rows whenever the filter changed. Fragment takes one.
+                <Fragment key={o.id}>
+                  <tr>
                     <td>{o.number}</td>
                     <td>{o.customer_name}{o.user_id ? "" : " (guest)"}</td>
                     <td>
@@ -100,7 +156,7 @@ export default function Orders() {
                     </td>
                   </tr>
                   {open === o.id && (
-                    <tr key={`${o.id}-items`}>
+                    <tr>
                       <td colSpan="8" style={{ background: "var(--bg)" }}>
                         <table className="admin-table" style={{ margin: "4px 0" }}>
                           <thead>
@@ -125,11 +181,22 @@ export default function Orders() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
             </table>
           </div>
+        )}
+
+        {result && (
+          <Pager
+            page={result.page}
+            pages={result.pages}
+            total={result.total}
+            limit={result.limit}
+            label="orders"
+            onPage={setPage}
+          />
         )}
       </div>
     </>

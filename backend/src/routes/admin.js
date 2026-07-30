@@ -43,6 +43,15 @@ router.use(requireAdmin);
 
 const NOT_CANCELLED = { status: { $ne: "cancelled" } };
 
+/** Clamped page/limit for the admin listings. */
+function paging(query, { defaultLimit = 25, maxLimit = 100 } = {}) {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(Math.max(1, parseInt(query.limit, 10) || defaultLimit), maxLimit);
+  return { page, limit, skip: (page - 1) * limit };
+}
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /* ================= Analytics ================= */
 
 router.get("/stats", async (_req, res, next) => {
@@ -176,10 +185,29 @@ router.get("/stats", async (_req, res, next) => {
 
 router.get("/orders", async (req, res, next) => {
   try {
-    const { status } = req.query;
+    const { status, search } = req.query;
     const filter = status && ORDER_STATUSES.includes(status) ? { status } : {};
-    const orders = await Order.find(filter).sort({ created_at: -1 }).limit(200);
-    res.json({ orders });
+
+    // Find a specific order by number, customer, phone or town — without this,
+    // anything past the current page was unreachable.
+    const term = search ? String(search).trim() : "";
+    if (term) {
+      const rx = new RegExp(escapeRegex(term), "i");
+      filter.$or = [
+        { customer_name: rx },
+        { phone: rx },
+        { city: rx },
+        { email: rx },
+        ...(/^\d+$/.test(term) ? [{ number: Number(term) }] : []),
+      ];
+    }
+
+    const { page, limit, skip } = paging(req.query, { defaultLimit: 25 });
+    const [orders, total] = await Promise.all([
+      Order.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
+      Order.countDocuments(filter),
+    ]);
+    res.json({ orders, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
   } catch (err) {
     next(err);
   }
@@ -212,6 +240,33 @@ router.patch("/orders/:id", async (req, res, next) => {
 });
 
 /* ================= Products ================= */
+
+/**
+ * Admin catalogue listing. The dashboard previously read the public
+ * GET /api/products, which caps at 100 — product 101 was uneditable and
+ * undeletable with no error shown. This one pages through everything.
+ */
+router.get("/products", async (req, res, next) => {
+  try {
+    const { search, category } = req.query;
+    const filter = {};
+    if (category) filter.category = category;
+    const term = search ? String(search).trim() : "";
+    if (term) {
+      const rx = new RegExp(escapeRegex(term), "i");
+      filter.$or = [{ name: rx }, { category: rx }, { slug: rx }];
+    }
+
+    const { page, limit, skip } = paging(req.query, { defaultLimit: 25 });
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
+      Product.countDocuments(filter),
+    ]);
+    res.json({ products, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
+  } catch (err) {
+    next(err);
+  }
+});
 
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 

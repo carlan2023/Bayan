@@ -52,6 +52,16 @@ const productSchema = new mongoose.Schema(
   { timestamps, toJSON: baseToJSON }
 );
 
+// Catalogue search used an unindexed $or of three regexes — a full collection
+// scan per query. A text index serves whole-word matches from the index; the
+// route keeps a regex fallback for partial words, which $text cannot do.
+productSchema.index(
+  { name: "text", description: "text", category: "text" },
+  { weights: { name: 10, category: 5, description: 1 }, name: "product_text" }
+);
+// Supports the default catalogue sort and the admin listing.
+productSchema.index({ created_at: -1 });
+
 export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
 
 const orderSchema = new mongoose.Schema(
@@ -103,6 +113,11 @@ const orderSchema = new mongoose.Schema(
     },
   }
 );
+
+// The admin order list filters by status and always sorts newest-first; the
+// customer's own history filters by user and does the same.
+orderSchema.index({ status: 1, created_at: -1 });
+orderSchema.index({ user: 1, created_at: -1 });
 
 const counterSchema = new mongoose.Schema({ _id: String, seq: { type: Number, default: 0 } });
 

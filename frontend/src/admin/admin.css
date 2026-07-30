@@ -133,6 +133,20 @@
 
 .empty-mini { color: var(--ink-soft); font-size: 0.9rem; padding: 18px 0; }
 
+/* Pagination */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.pager-count, .pager-page { font-size: 0.85rem; color: var(--ink-soft); }
+.pager button:disabled { opacity: 0.45; cursor: not-allowed; }
+
 @media (max-width: 760px) {
   .admin-shell { flex-direction: column; }
   .admin-side { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; gap: 12px; overflow-x: auto; }

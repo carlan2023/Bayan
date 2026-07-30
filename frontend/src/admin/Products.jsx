@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, fmtPrice } from "../api";
+import Pager from "./Pager";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
@@ -54,8 +55,15 @@ function toPayload(f) {
   };
 }
 
+const PAGE_SIZE = 25;
+
 export default function Products() {
-  const [products, setProducts] = useState(null);
+  const [page, setPage] = useState(1);
+  // Server-side search: the old client-side filter could only narrow the 100
+  // products the public endpoint would return, so the rest were unreachable.
+  const [filter, setFilter] = useState("");
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState(null);
   const [form, setForm] = useState(null); // null = closed, {...} = open
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
@@ -63,12 +71,35 @@ export default function Products() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [colorUploading, setColorUploading] = useState(null); // index currently uploading
-  const [filter, setFilter] = useState("");
 
-  const load = () => api.products({ limit: 100 }).then((d) => setProducts(d.products));
+  const load = useCallback(
+    () =>
+      api.admin
+        .products({ page, limit: PAGE_SIZE, search: query })
+        .then(setResult)
+        .catch((e) => setError(e.message)),
+    [page, query]
+  );
+
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  // Debounce typing so each keystroke isn't a request.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQuery(filter.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [filter]);
+
+  const products = result?.products ?? null;
+
+  // Deleting the last row on the last page would otherwise strand us past the end.
+  useEffect(() => {
+    if (result && result.page > result.pages) setPage(result.pages);
+  }, [result]);
 
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
@@ -143,19 +174,16 @@ export default function Products() {
     load();
   }
 
-  const shown = products?.filter(
-    (p) =>
-      !filter ||
-      p.name.toLowerCase().includes(filter.toLowerCase()) ||
-      p.category.toLowerCase().includes(filter.toLowerCase())
-  );
-
   return (
     <>
       <div className="admin-head">
         <div>
           <h1>Products</h1>
-          <p>{products ? `${products.length} in catalogue` : "Loading…"}</p>
+          <p>
+            {result
+              ? `${result.total} in catalogue${query ? ` matching “${query}”` : ""}`
+              : "Loading…"}
+          </p>
         </div>
         <div className="tools">
           <input
@@ -366,8 +394,12 @@ export default function Products() {
       )}
 
       <div className="admin-panel">
-        {!shown ? (
+        {!products ? (
           <div className="spinner">Loading…</div>
+        ) : products.length === 0 ? (
+          <div className="empty-mini">
+            {query ? `No products match “${query}”.` : "No products yet — create the first one."}
+          </div>
         ) : (
           <div className="table-scroll">
             <table className="admin-table">
@@ -382,7 +414,7 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {shown.map((p) => (
+              {products.map((p) => (
                 <tr key={p.id}>
                   <td>
                     <div className="prod-cell">
@@ -417,6 +449,17 @@ export default function Products() {
             </tbody>
             </table>
           </div>
+        )}
+
+        {result && (
+          <Pager
+            page={result.page}
+            pages={result.pages}
+            total={result.total}
+            limit={result.limit}
+            label="products"
+            onPage={setPage}
+          />
         )}
       </div>
     </>

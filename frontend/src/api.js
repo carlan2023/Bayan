@@ -20,14 +20,17 @@ async function request(path, { method = "GET", body } = {}) {
   return data;
 }
 
+/** Builds a query string, dropping empty values. */
+function qs(params = {}) {
+  const s = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ""))
+  ).toString();
+  return s ? `?${s}` : "";
+}
+
 export const api = {
   // products
-  products: (params = {}) => {
-    const qs = new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ""))
-    ).toString();
-    return request(`/products${qs ? "?" + qs : ""}`);
-  },
+  products: (params = {}) => request(`/products${qs(params)}`),
   product: (slug) => request(`/products/${slug}`),
   productsByIds: (ids) => request(`/products?ids=${ids.map(encodeURIComponent).join(",")}`),
   categories: () => request("/products/categories"),
@@ -52,7 +55,9 @@ export const api = {
   // admin
   admin: {
     stats: () => request("/admin/stats"),
-    orders: (status) => request(`/admin/orders${status ? `?status=${status}` : ""}`),
+    // Both listings are paged: { orders|products, total, page, limit, pages }
+    orders: (params = {}) => request(`/admin/orders${qs(params)}`),
+    products: (params = {}) => request(`/admin/products${qs(params)}`),
     setOrderStatus: (id, status) => request(`/admin/orders/${id}`, { method: "PATCH", body: { status } }),
     createProduct: (body) => request("/admin/products", { method: "POST", body }),
     updateProduct: (id, body) => request(`/admin/products/${id}`, { method: "PUT", body }),

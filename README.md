@@ -48,7 +48,9 @@ Open http://localhost:5173/admin and sign in as the super user:
 - Override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars before first boot; the account is created automatically.
 - In production (`NODE_ENV=production`) the `admin123` fallback is never used: if `ADMIN_PASSWORD` is unset, a random password is generated and printed **once** to the deploy logs. Capture it then, or set `ADMIN_PASSWORD` yourself.
 
-Features: analytics overview (revenue, orders, AOV, customers, 14-day revenue chart, orders-by-status and revenue-by-category donuts, top products, low stock alerts, recent orders), full product management (create / edit / delete with colour and size editors, featured flag, sale pricing), order management (filter by status, view line items, advance status: pending → confirmed → dispatched → delivered; cancelling restocks inventory), and a customer list with lifetime spend. Admin endpoints live under `/api/admin/*` and re-check the admin flag in the database on every request.
+Features: analytics overview (revenue, orders, AOV, customers, 14-day revenue chart, orders-by-status and revenue-by-category donuts, top products, low stock alerts, recent orders), full product management (create / edit / delete with colour and size editors, featured flag, sale pricing), order management (filter by status, search by order number / name / phone / town, view line items, advance status: pending → confirmed → dispatched → delivered; cancelling restocks inventory), and a customer list with lifetime spend. Admin endpoints live under `/api/admin/*` and re-check the admin flag in the database on every request.
+
+The products and orders listings are paged server-side (25 per page, `?page=&limit=&search=`) and return `{ total, page, limit, pages }` alongside the rows — the whole catalogue and order history are reachable regardless of size.
 
 ## API
 
@@ -64,7 +66,19 @@ GET    /api/orders                 (auth — own history)
 GET    /api/wishlist               (auth)
 POST   /api/wishlist/:productId    (auth)
 DELETE /api/wishlist/:productId    (auth)
+
+GET    /api/admin/stats                              (admin)
+GET    /api/admin/products?page=&limit=&search=      (admin, paged)
+GET    /api/admin/orders?status=&page=&limit=&search= (admin, paged)
+PATCH  /api/admin/orders/:id                         (admin)
+POST   /api/admin/products                           (admin)
+PUT    /api/admin/products/:id                       (admin)
+DELETE /api/admin/products/:id                       (admin)
+POST   /api/admin/uploads                            (admin, multipart)
+GET    /api/admin/customers                          (admin)
 ```
+
+Catalogue search uses a MongoDB text index on name / description / category (weighted, name highest). `$text` only matches whole words, so a partial term like `lin` falls back to an unindexed substring scan — that fallback also covers the window while the index is still building.
 
 ## Deployment (Railway)
 

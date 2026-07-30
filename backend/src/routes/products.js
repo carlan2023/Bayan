@@ -13,6 +13,12 @@ const SORTS = {
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Substring match across the searchable fields — unindexed, used as a fallback. */
+const regexFilter = (term) => {
+  const rx = new RegExp(escapeRegex(term), "i");
+  return { $or: [{ name: rx }, { description: rx }, { category: rx }] };
+};
+
 router.get("/", async (req, res, next) => {
   try {
     const { category, search, sort, featured, limit, ids } = req.query;
@@ -29,14 +35,34 @@ router.get("/", async (req, res, next) => {
       if (list.length === 0) return res.json({ products: [], count: 0 });
       filter._id = { $in: list };
     }
-    if (search) {
-      const rx = new RegExp(escapeRegex(String(search)), "i");
-      filter.$or = [{ name: rx }, { description: rx }, { category: rx }];
-    }
     const lim = Math.min(parseInt(limit, 10) || 100, 100);
-    const products = await Product.find(filter)
-      .sort(SORTS[sort] || SORTS.newest)
-      .limit(lim);
+    const order = SORTS[sort] || SORTS.newest;
+    const term = search ? String(search).trim() : "";
+
+    // Index-backed whole-word search first. $text cannot match partial words
+    // ("dres" would miss "Dress"), so fall back to the unindexed substring
+    // scan only when it finds nothing — the minority case on a real catalogue.
+    let products = [];
+    if (term) {
+      try {
+        products = await Product.find({ ...filter, $text: { $search: term } })
+          .sort(order)
+          .limit(lim);
+      } catch (err) {
+        // IndexNotFound (27): the text index is still building or autoIndex is
+        // off. Degrade to the regex scan — slower, but search keeps working.
+        if (err?.code !== 27) throw err;
+        products = [];
+      }
+      if (products.length === 0) {
+        products = await Product.find({ ...filter, ...regexFilter(term) })
+          .sort(order)
+          .limit(lim);
+      }
+    } else {
+      products = await Product.find(filter).sort(order).limit(lim);
+    }
+
     res.json({ products, count: products.length });
   } catch (err) {
     next(err);

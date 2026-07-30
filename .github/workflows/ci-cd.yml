@@ -64,6 +64,9 @@ jobs:
           COUNT=$(curl -sf "localhost:4000/api/products" | python3 -c "import json,sys; print(json.load(sys.stdin)['count'])")
           [ "$COUNT" -ge 1 ] || fail "catalog empty after seed"
           curl -sf "localhost:4000/api/products?search=linen" | grep -qi linen || fail "search failed"
+          # Partial words fall back to the substring scan ($text is whole-word only)
+          curl -sf "localhost:4000/api/products?search=lin" | grep -qi linen \
+            || fail "partial-word search fallback failed"
 
           # storefront config — the client quotes totals from these
           curl -sf localhost:4000/api/config | grep -q '"free_delivery_threshold_cents"' || fail "config endpoint failed"
@@ -113,6 +116,25 @@ jobs:
             -d '{"status":"confirmed"}' | grep -q confirmed || fail "order status update failed"
           GATE=$(curl -s -o /dev/null -w "%{http_code}" localhost:4000/api/admin/stats -H "Authorization: Bearer $TOKEN")
           [ "$GATE" = "403" ] || fail "non-admin was not blocked from admin API (got $GATE)"
+
+          # ---- paged admin listings ----
+          # Page 1 and 2 must return different products and a consistent total.
+          P1=$(curl -sf "localhost:4000/api/admin/products?page=1&limit=2" -H "Authorization: Bearer $ADMIN")
+          echo "$P1" | grep -q '"total"' || fail "admin products listing missing pagination metadata"
+          TOTAL=$(echo "$P1" | python3 -c "import json,sys; print(json.load(sys.stdin)['total'])")
+          [ "$TOTAL" -ge 2 ] || fail "expected at least 2 seeded products, got $TOTAL"
+          ID1=$(echo "$P1" | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          ID2=$(curl -sf "localhost:4000/api/admin/products?page=2&limit=2" -H "Authorization: Bearer $ADMIN" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          [ "$ID1" != "$ID2" ] || fail "admin products page 2 returned the same row as page 1"
+
+          # Admin listings are behind the admin gate
+          PGATE=$(curl -s -o /dev/null -w "%{http_code}" localhost:4000/api/admin/products -H "Authorization: Bearer $TOKEN")
+          [ "$PGATE" = "403" ] || fail "non-admin reached admin products listing (got $PGATE)"
+
+          # Order search by number finds the order created above
+          curl -sf "localhost:4000/api/admin/orders?search=$(echo "$ORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['number'])")" \
+            -H "Authorization: Bearer $ADMIN" | grep -q '"customer_name"' || fail "admin order search by number failed"
 
           # ---- stock accounting: units must never be stranded ----
           stock_of() {

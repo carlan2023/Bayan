@@ -47,14 +47,19 @@ Small diffs, disproportionate UX payoff.
 
 **Not verified visually** — same constraint as the mobile shell: build and static review only, no rendered check of the heart button, error screens or 404 page.
 
-## Milestone 4 — Admin at scale
+## Milestone 4 — Admin at scale ✅
 
 Works at 24 products; breaks quietly as the catalogue grows.
 
-- [ ] **Admin catalogue is capped at 100.** `admin/Products.jsx:68` loads through the *public* `GET /api/products`, which `routes/products.js:25` hard-caps at 100. Product #101 becomes uneditable and undeletable with no error shown. Add `GET /api/admin/products` with pagination and search.
-- [ ] **Admin orders capped at 200.** `admin.js:181` has no paging or date filter — order #201 disappears from the admin UI permanently.
-- [ ] **React key bug.** `admin/Orders.jsx:70` maps to a shorthand `<>…</>` fragment, which cannot carry a key. The `key` on line 71 is on the inner `<tr>`, not the list child, so React warns and mis-reconciles rows when the status filter changes. Use `<Fragment key={o.id}>`.
-- [ ] **Unindexed product search.** `products.js:21-24` builds an `$or` regex across three fields — a full collection scan per keystroke-driven query. Add a text index and switch to `$text`.
+- [x] **Admin catalogue was capped at 100.** `admin/Products.jsx` loaded through the *public* `GET /api/products`, which hard-caps at 100 — product 101 was uneditable and undeletable with no error shown. → New paged `GET /api/admin/products` (25/page, `?page=&limit=&search=`). The client-side name filter became a debounced server-side search, so it now searches the whole catalogue rather than only the first 100 rows.
+- [x] **Admin orders capped at 200.** → Paged the same way, plus search by order number, customer name, phone, email or town. Without search, a specific old order was unreachable however many pages you clicked.
+- [x] **React key bug.** `admin/Orders.jsx` mapped to a shorthand `<>…</>`, which cannot carry a key; the `key` sat on the inner `<tr>`, so it was not the list child's key. React warned and mis-reconciled rows when the filter changed. → `<Fragment key={o.id}>`, and the now-redundant key on the nested items row removed.
+- [x] **Unindexed product search.** An `$or` of three regexes meant a full collection scan per query. → Weighted text index on name / description / category. `$text` is whole-word only, so a partial term falls back to the regex scan; that same fallback catches `IndexNotFound` (code 27), meaning search still works if the index is mid-build or `autoIndex` is off. Strictly no worse than before, indexed in the common case.
+- [x] Added indexes for the queries that always run: `products.created_at`, `orders.{status,created_at}`, `orders.{user,created_at}`.
+- [x] New shared `Pager` component; both listings show "n–m of total" and clamp back a page when the last row on the last page is deleted.
+- [x] CI asserts pagination metadata, that page 2 differs from page 1, that the new listing is behind the admin gate, order search by number, and the partial-word search fallback.
+
+**Not verified visually** — same as the previous two batches.
 
 ## Milestone 5 — Security & release hygiene
 
