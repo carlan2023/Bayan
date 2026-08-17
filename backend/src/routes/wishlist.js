@@ -1,6 +1,6 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import { User, Product } from "../db.js";
+import { User, Product, notify } from "../db.js";
 import { requireAuth } from "../auth.js";
 
 const router = Router();
@@ -23,7 +23,20 @@ router.post("/:productId", async (req, res, next) => {
     }
     const product = await Product.findById(req.params.productId);
     if (!product) return res.status(404).json({ error: "Product not found" });
-    await User.updateOne({ _id: req.user.id }, { $addToSet: { wishlist: product._id } });
+    // $addToSet reports whether this was a fresh save or a repeat click; only
+    // fresh saves are worth telling the admin about.
+    const result = await User.updateOne(
+      { _id: req.user.id },
+      { $addToSet: { wishlist: product._id } }
+    );
+    if (result.modifiedCount > 0) {
+      notify(
+        "wishlist",
+        `${req.user.name} saved "${product.name}"`,
+        "Added to their wishlist — interest worth watching.",
+        "/admin/products"
+      );
+    }
     res.status(201).json({ ok: true });
   } catch (err) {
     next(err);

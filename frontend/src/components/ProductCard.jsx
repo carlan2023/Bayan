@@ -1,14 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtPrice } from "../api";
-import { useWishlist } from "../store";
+import { useConfig, useWishlist } from "../store";
 import ProductImage from "./ProductImage";
-import { HeartIcon } from "./Icons";
+import { HeartIcon, WhatsAppIcon } from "./Icons";
+import { waProductLink } from "../whatsapp";
 
 export default function ProductCard({ product }) {
   const { has, toggle } = useWishlist();
+  const { urgency_stock_threshold } = useConfig();
   const [error, setError] = useState("");
   const wished = has(product.id);
+  // Scarcity cue, using the server's threshold so both agree.
+  const lowStock =
+    typeof product.stock === "number" && product.stock > 0 && product.stock <= urgency_stock_threshold;
 
   async function onWish(e) {
     // The card is a link; don't navigate when the heart is tapped.
@@ -29,6 +34,7 @@ export default function ProductCard({ product }) {
         <div className="card-img">
           {product.compare_at_cents && <span className="badge">Sale</span>}
           <ProductImage product={product} />
+          {lowStock && <span className="stock-banner">Only {product.stock} left</span>}
         </div>
         <div>
           <div className="cat">{product.category}</div>
@@ -51,6 +57,19 @@ export default function ProductCard({ product }) {
       >
         <HeartIcon size={16} filled={wished} />
       </button>
+
+      {/* WhatsApp enquiry — a real link, also outside the card's Link. */}
+      <a
+        className="wish-btn wa-btn"
+        href={waProductLink(product)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Ask about ${product.name} on WhatsApp`}
+        title="Ask about this on WhatsApp"
+      >
+        <WhatsAppIcon size={16} />
+      </a>
 
       <div className="swatches">
         {product.colors.map((c) => (

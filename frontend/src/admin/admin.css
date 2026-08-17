@@ -133,6 +133,39 @@
 
 .empty-mini { color: var(--ink-soft); font-size: 0.9rem; padding: 18px 0; }
 
+/* ================= Storefront hero editor ================= */
+/* The frame matches the storefront banner's proportions, so what the admin
+   frames here is what shoppers actually see. */
+.hero-editor { display: flex; flex-direction: column; gap: 20px; align-items: stretch; }
+.hero-edit-frame {
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  touch-action: none; /* the frame is a drag surface on touch screens */
+}
+.hero-edit-frame.has-media { cursor: grab; }
+.hero-edit-frame.has-media:active { cursor: grabbing; }
+.hero-edit-frame img,
+.hero-edit-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+.hero-edit-empty { color: var(--ink-soft); font-size: 0.9rem; padding: 0 20px; text-align: center; }
+.hero-edit-controls { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.hero-zoom { width: min(320px, 100%); }
+.hero-zoom label { display: block; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
+.hero-zoom input[type="range"] { width: 100%; accent-color: var(--clay); }
+.hero-hint { font-size: 0.85rem; color: var(--ink-soft); max-width: 52ch; }
+
 /* Pagination */
 .pager {
   display: flex;

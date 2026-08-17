@@ -38,6 +38,9 @@ export const api = {
   // storefront constants (currency, delivery pricing)
   config: () => request("/config"),
 
+  // landing-page hero media (public)
+  hero: () => request("/hero"),
+
   // auth
   register: (body) => request("/auth/register", { method: "POST", body }),
   login: (body) => request("/auth/login", { method: "POST", body }),
@@ -63,6 +66,23 @@ export const api = {
     updateProduct: (id, body) => request(`/admin/products/${id}`, { method: "PUT", body }),
     deleteProduct: (id) => request(`/admin/products/${id}`, { method: "DELETE" }),
     customers: () => request("/admin/customers"),
+    saveHero: (body) => request("/admin/hero", { method: "PUT", body }),
+    uploadHeroMedia: async (file) => {
+      const body = new FormData();
+      body.append("file", file);
+      const token = getToken();
+      const res = await fetch(`${BASE}/admin/hero/upload`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      return data; // { url, media_type }
+    },
+    notifications: (params = {}) => request(`/admin/notifications${qs(params)}`),
+    markNotificationRead: (id) => request(`/admin/notifications/${id}/read`, { method: "PATCH" }),
+    markAllNotificationsRead: () => request("/admin/notifications/read-all", { method: "PATCH" }),
     uploadImage: async (file) => {
       const body = new FormData();
       body.append("file", file);

@@ -6,13 +6,14 @@ import { useAsync } from "../useAsync";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
-import { HeartIcon, CheckIcon } from "../components/Icons";
+import { HeartIcon, CheckIcon, WhatsAppIcon } from "../components/Icons";
+import { waProductLink } from "../whatsapp";
 
 export default function Product() {
   const { slug } = useParams();
   const { add } = useCart();
   const { has, toggle } = useWishlist();
-  const { free_delivery_threshold_cents } = useConfig();
+  const { free_delivery_threshold_cents, urgency_stock_threshold } = useConfig();
 
   const { data, error: loadError, loading, reload } = useAsync(() => api.product(slug), [slug]);
 
@@ -54,6 +55,7 @@ export default function Product() {
   const wished = has(product.id);
   // Adding a sold-out item used to succeed and only fail at checkout.
   const soldOut = product.stock <= 0;
+  const lowStock = !soldOut && product.stock <= urgency_stock_threshold;
 
   // Show the photo for the chosen colour, falling back to the product's main image.
   const activeColor = product.colors.find((c) => c.name === color);
@@ -92,6 +94,13 @@ export default function Product() {
             {fmtPrice(product.price_cents)}
             {product.compare_at_cents && <span className="was">{fmtPrice(product.compare_at_cents)}</span>}
           </div>
+          {lowStock && (
+            <div className="stock-alert" role="status">
+              <span className="stock-alert-dot" aria-hidden="true" />
+              Only {product.stock} left in stock — once it's gone, it's gone.
+            </div>
+          )}
+
           <p className="desc">{product.description}</p>
 
           <div className="opt-label">Colour — {color}</div>
@@ -144,6 +153,14 @@ export default function Product() {
             >
               {wished ? "Saved" : "Wishlist"} <HeartIcon size={16} filled={wished} />
             </button>
+            <a
+              className="btn btn-wa btn-icon"
+              href={waProductLink(product)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ask on WhatsApp <WhatsAppIcon size={16} />
+            </a>
           </div>
 
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}

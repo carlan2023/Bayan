@@ -4,6 +4,7 @@ import { useConfig } from "../store";
 import { useAsync } from "../useAsync";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
+import WhatsAppFloat from "../components/WhatsAppFloat";
 
 const CAT_COLORS = {
   Women: "linear-gradient(135deg, #2e4b3f, #4a6b5a)",
@@ -27,21 +28,51 @@ export default function Home() {
   const featured = data?.featured ?? [];
   const cats = data?.cats ?? [];
 
+  // Hero media is set by the admin (Storefront page); the gradient is the
+  // fallback, so a failed fetch just means the default look.
+  const { data: heroData } = useAsync(() => api.hero().catch(() => ({ hero: null })), []);
+  const hero = heroData?.hero ?? null;
+  const heroMediaStyle = hero
+    ? {
+        objectPosition: `${hero.x}% ${hero.y}%`,
+        transform: `scale(${hero.zoom})`,
+        transformOrigin: `${hero.x}% ${hero.y}%`,
+      }
+    : undefined;
+
   return (
     <>
       <div className="container">
-        <section className="hero">
-          <div className="eyebrow">New season · SS26</div>
-          <h1>
-            Dress well. Live well. <em>Pay at your door.</em>
-          </h1>
-          <p>
-            Considered clothing, jewellery and fragrance in natural fabrics and
-            honest colours — delivered countrywide with cash on delivery.
-          </p>
-          <Link to="/shop" className="btn btn-accent">
-            Shop the collection
-          </Link>
+        <section className={`hero ${hero ? "has-media" : ""}`}>
+          {hero &&
+            (hero.media_type === "video" ? (
+              <video
+                className="hero-media"
+                src={hero.url}
+                style={heroMediaStyle}
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ) : (
+              <img className="hero-media" src={hero.url} style={heroMediaStyle} alt="" />
+            ))}
+          {hero && <div className="hero-scrim" aria-hidden="true" />}
+
+          <div className="hero-content">
+            <div className="eyebrow">New season · SS26</div>
+            <h1>
+              Dress well. Live well. <em>Pay at your door.</em>
+            </h1>
+            <p>
+              Considered clothing, jewellery and fragrance in natural fabrics and
+              honest colours — delivered countrywide with cash on delivery.
+            </p>
+            <Link to="/shop" className="btn btn-accent">
+              Shop the collection
+            </Link>
+          </div>
         </section>
       </div>
 
@@ -117,6 +148,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <WhatsAppFloat />
     </>
   );
 }

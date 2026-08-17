@@ -1,8 +1,11 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import { Product, Order, nextOrderNumber } from "../db.js";
+import { Product, Order, nextOrderNumber, notify } from "../db.js";
 import { optionalAuth, requireAuth } from "../auth.js";
-import { deliveryFor, MAX_QTY_PER_LINE } from "../config.js";
+import { deliveryFor, MAX_QTY_PER_LINE, LOW_STOCK_THRESHOLD } from "../config.js";
+import { alertLowStock } from "../stock-alerts.js";
+
+const fmtUGX = (cents) => `USh ${Math.round(cents / 100).toLocaleString("en-US")}`;
 
 const router = Router();
 
@@ -51,13 +54,15 @@ router.post("/", optionalAuth, async (req, res, next) => {
     for (const l of lines) {
       const updated = await Product.findOneAndUpdate(
         { _id: l.product._id, stock: { $gte: l.qty } },
-        { $inc: { stock: -l.qty } }
+        { $inc: { stock: -l.qty } },
+        { new: true } // read the post-decrement stock for the alerts below
       );
       if (!updated) {
         await release();
         return res.status(409).json({ error: `"${l.product.name}" just sold out — please adjust your bag` });
       }
       reserved.push(l);
+      l.stockAfter = updated.stock;
     }
 
     const subtotal = lines.reduce((sum, l) => sum + l.product.price_cents * l.qty, 0);
@@ -85,6 +90,24 @@ router.post("/", optionalAuth, async (req, res, next) => {
       delivery_cents: delivery,
       total_cents: subtotal + delivery,
     });
+
+    // Admin activity feed. After the response is decided — never blocks checkout.
+    const itemCount = lines.reduce((n, l) => n + l.qty, 0);
+    notify(
+      "order",
+      `New order #${order.number} — ${fmtUGX(order.total_cents)}`,
+      `${order.customer_name}, ${order.city} · ${itemCount} item${itemCount === 1 ? "" : "s"} · cash on delivery`,
+      "/admin/orders"
+    );
+    // Stock alerts are rate-limited to once a day per product and repeat
+    // daily until it's restocked — see src/stock-alerts.js.
+    for (const l of lines) {
+      if (l.stockAfter <= LOW_STOCK_THRESHOLD) {
+        alertLowStock({ _id: l.product._id, name: l.product.name, stock: l.stockAfter }).catch((e) =>
+          console.error("Low-stock alert failed:", e.message)
+        );
+      }
+    }
 
     res.status(201).json({ order });
   } catch (err) {

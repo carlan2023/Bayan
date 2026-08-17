@@ -10,6 +10,18 @@ export const FREE_DELIVERY_THRESHOLD_CENTS = 20000000; // UGX 200,000 (stored as
 export const DELIVERY_FEE_CENTS = 1000000; // UGX 10,000 (stored as cents)
 export const MAX_QTY_PER_LINE = 20;
 
+/**
+ * Stock thresholds.
+ *
+ * LOW_STOCK_THRESHOLD drives the admin's restock alerts (repeated every
+ * LOW_STOCK_REALERT_HOURS until the item is replenished).
+ * URGENCY_STOCK_THRESHOLD is the tighter number at which shoppers see a
+ * "only N left" banner — served to the client so both agree.
+ */
+export const LOW_STOCK_THRESHOLD = 5;
+export const URGENCY_STOCK_THRESHOLD = 3;
+export const LOW_STOCK_REALERT_HOURS = 24;
+
 export const deliveryFor = (subtotalCents) =>
   subtotalCents >= FREE_DELIVERY_THRESHOLD_CENTS ? 0 : DELIVERY_FEE_CENTS;
 
@@ -19,4 +31,5 @@ export const publicConfig = () => ({
   free_delivery_threshold_cents: FREE_DELIVERY_THRESHOLD_CENTS,
   delivery_fee_cents: DELIVERY_FEE_CENTS,
   max_qty_per_line: MAX_QTY_PER_LINE,
+  urgency_stock_threshold: URGENCY_STOCK_THRESHOLD,
 });

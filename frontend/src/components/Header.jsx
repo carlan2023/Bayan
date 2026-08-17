@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useCart, useConfig } from "../store";
 import { fmtPrice } from "../api";
 import { HeartIcon, BagIcon, MenuIcon, CloseIcon, SearchIcon } from "./Icons";
+import Notifications from "../admin/Notifications";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
@@ -118,6 +119,9 @@ export default function Header() {
               <SearchIcon size={20} />
             </button>
 
+            {/* Admins see the activity bell everywhere on the storefront, so a
+                new order or stock-out can't go unnoticed while they browse. */}
+            {user?.is_admin && <Notifications variant="header" />}
             {user?.is_admin && (
               <Link to="/admin" className="icon-btn desktop-only" style={{ color: "var(--clay-dark)" }}>
                 Admin

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmtPrice } from "../api";
+import { compressImage } from "../imageCompress";
 import Pager from "./Pager";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
@@ -118,7 +119,7 @@ export default function Products() {
     setError("");
     setColorUploading(i);
     try {
-      const { url } = await api.admin.uploadImage(file);
+      const { url } = await api.admin.uploadImage(await compressImage(file));
       setColor(i, "image", url);
     } catch (err) {
       setError(err.message);
@@ -134,7 +135,7 @@ export default function Products() {
     setError("");
     setUploading(true);
     try {
-      const { url } = await api.admin.uploadImage(file);
+      const { url } = await api.admin.uploadImage(await compressImage(file));
       setForm((f) => ({ ...f, image: url }));
     } catch (err) {
       setError(err.message);

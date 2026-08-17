@@ -48,6 +48,9 @@ const productSchema = new mongoose.Schema(
     fabric: { type: String, default: null },
     featured: { type: Boolean, default: false },
     stock: { type: Number, default: 50, min: 0 },
+    // When the admin was last told this item is running low. Drives the
+    // 24-hourly re-alert and is cleared the moment it's restocked.
+    low_stock_alert_at: { type: Date, default: null },
   },
   { timestamps, toJSON: baseToJSON }
 );
@@ -121,10 +124,64 @@ orderSchema.index({ user: 1, created_at: -1 });
 
 const counterSchema = new mongoose.Schema({ _id: String, seq: { type: Number, default: 0 } });
 
+/* ---------------- Notifications ----------------
+   In-app activity feed for the admin: new orders, wishlist saves, stock
+   alerts, new customers. Rows are small and pruned, so the collection can't
+   grow without bound. */
+export const NOTIFICATION_TYPES = ["order", "wishlist", "stock_low", "stock_out", "customer"];
+
+const notificationSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: NOTIFICATION_TYPES, required: true },
+    title: { type: String, required: true },
+    body: { type: String, default: "" },
+    // Where the admin should land when they click it (client-side route).
+    link: { type: String, default: null },
+    read: { type: Boolean, default: false },
+  },
+  { timestamps, toJSON: baseToJSON }
+);
+notificationSchema.index({ read: 1, created_at: -1 });
+notificationSchema.index({ created_at: -1 });
+
+/* Free-form storefront settings (hero media, future banners). One document
+   per key; the shape of `data` is owned by the route that writes it. */
+const settingSchema = new mongoose.Schema(
+  { _id: String, data: { type: mongoose.Schema.Types.Mixed, default: {} } },
+  { timestamps }
+);
+
 export const User = mongoose.model("User", userSchema);
 export const Product = mongoose.model("Product", productSchema);
 export const Order = mongoose.model("Order", orderSchema);
 export const Counter = mongoose.model("Counter", counterSchema);
+export const Notification = mongoose.model("Notification", notificationSchema);
+export const Setting = mongoose.model("Setting", settingSchema);
+
+const MAX_NOTIFICATIONS = 500;
+
+/**
+ * Record an admin notification. Fire-and-forget by design: a notification
+ * failure must never break the checkout/wishlist/register flow it decorates,
+ * so errors are logged and swallowed.
+ */
+export function notify(type, title, body = "", link = null) {
+  Notification.create({ type, title, body, link })
+    .then(async () => {
+      // Occasional prune keeps the collection bounded without a TTL job.
+      if (Math.random() < 0.05) {
+        const cutoff = await Notification.find()
+          .sort({ created_at: -1 })
+          .skip(MAX_NOTIFICATIONS)
+          .limit(1)
+          .select("created_at");
+        if (cutoff.length > 0) {
+          await Notification.deleteMany({ created_at: { $lt: cutoff[0].created_at } });
+        }
+      }
+    })
+    .catch((err) => console.error("Failed to record notification:", err.message));
+}
 
 /** Sequential, human-friendly order numbers (#1001, #1002, …). */
 export async function nextOrderNumber() {

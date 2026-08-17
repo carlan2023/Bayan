@@ -3,8 +3,11 @@ import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
-import { User, Product, Order, ORDER_STATUSES } from "../db.js";
+import { User, Product, Order, Notification, Setting, ORDER_STATUSES } from "../db.js";
 import { requireAuth } from "../auth.js";
+import { isAllowedImage, isAllowedHeroMedia, isAllowedVideo, uploadFilename } from "../uploads.js";
+import { slugify, validateProduct, productFields } from "../product-fields.js";
+import { LOW_STOCK_THRESHOLD } from "../config.js";
 
 const router = Router();
 
@@ -17,14 +20,41 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    // Name and extension are derived from the mimetype allowlist, never from
+    // the client's filename — see src/uploads.js for why.
     filename: (_req, file, cb) => {
-      const ext = (path.extname(file.originalname || "") || ".jpg").toLowerCase().slice(0, 8);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+      try {
+        cb(null, uploadFilename(file.mimetype));
+      } catch (err) {
+        cb(err);
+      }
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 10 }, // 5 MB
   fileFilter: (_req, file, cb) =>
-    /^image\//.test(file.mimetype) ? cb(null, true) : cb(new Error("Only image files are allowed")),
+    isAllowedImage(file.mimetype)
+      ? cb(null, true)
+      : cb(new Error("Only JPEG, PNG, WebP, GIF or AVIF images are allowed")),
+});
+
+// Hero banner media: images or short videos. Videos can't be compressed in the
+// browser the way photos are, so the cap is far higher than product images.
+const heroUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      try {
+        cb(null, uploadFilename(file.mimetype));
+      } catch (err) {
+        cb(err);
+      }
+    },
+  }),
+  limits: { fileSize: 60 * 1024 * 1024, files: 1, fields: 10 }, // 60 MB
+  fileFilter: (_req, file, cb) =>
+    isAllowedHeroMedia(file.mimetype)
+      ? cb(null, true)
+      : cb(new Error("Only images (JPEG, PNG, WebP, GIF, AVIF) or videos (MP4, WebM, MOV) are allowed")),
 });
 
 /** Admin gate: valid JWT + is_admin re-checked against the DB on every request. */
@@ -51,6 +81,97 @@ function paging(query, { defaultLimit = 25, maxLimit = 100 } = {}) {
 }
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/* ================= Hero media ================= */
+
+const HERO_KEY = "hero";
+
+/** Clamp helper for the saved framing numbers. */
+const clampNum = (v, min, max, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+};
+
+router.post("/hero/upload", (req, res) => {
+  heroUpload.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    res.status(201).json({
+      url: `/uploads/${req.file.filename}`,
+      media_type: isAllowedVideo(req.file.mimetype) ? "video" : "image",
+    });
+  });
+});
+
+router.put("/hero", async (req, res, next) => {
+  try {
+    const { url, media_type, x, y, zoom } = req.body || {};
+    if (!url) {
+      // No url = remove the custom banner; the storefront falls back to its
+      // own gradient.
+      await Setting.deleteOne({ _id: HERO_KEY });
+      return res.json({ hero: null });
+    }
+    // Only media we host ourselves — an arbitrary URL here would let a stolen
+    // admin token point the homepage at any external content.
+    if (typeof url !== "string" || !url.startsWith("/uploads/")) {
+      return res.status(400).json({ error: "Hero media must be an uploaded file" });
+    }
+    if (!["image", "video"].includes(media_type)) {
+      return res.status(400).json({ error: "media_type must be image or video" });
+    }
+    const data = {
+      url,
+      media_type,
+      // Framing: focal point (% of the media) and zoom factor.
+      x: clampNum(x, 0, 100, 50),
+      y: clampNum(y, 0, 100, 50),
+      zoom: clampNum(zoom, 1, 3, 1),
+    };
+    await Setting.updateOne({ _id: HERO_KEY }, { $set: { data } }, { upsert: true });
+    res.json({ hero: data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ================= Notifications ================= */
+
+// Latest activity plus the unread count in one round trip — the client polls
+// this, so keep it a single cheap query pair.
+router.get("/notifications", async (req, res, next) => {
+  try {
+    const { limit } = paging(req.query, { defaultLimit: 30, maxLimit: 100 });
+    const [notifications, unread] = await Promise.all([
+      Notification.find().sort({ created_at: -1 }).limit(limit),
+      Notification.countDocuments({ read: false }),
+    ]);
+    res.json({ notifications, unread });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch("/notifications/read-all", async (_req, res, next) => {
+  try {
+    await Notification.updateMany({ read: false }, { $set: { read: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch("/notifications/:id/read", async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+    await Notification.updateOne({ _id: req.params.id }, { $set: { read: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /* ================= Analytics ================= */
 
@@ -268,8 +389,7 @@ router.get("/products", async (req, res, next) => {
   }
 });
 
-const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-
+/** Appends -2, -3, … until the slug is free. Needs the model, so it stays here. */
 async function uniqueSlug(name, excludeId = null) {
   const base = slugify(name) || "product";
   let slug = base;
@@ -279,54 +399,6 @@ async function uniqueSlug(name, excludeId = null) {
   while (await clash(slug)) slug = `${base}-${n++}`;
   return slug;
 }
-
-function validateProduct(body) {
-  const errors = [];
-  if (!body.name?.trim()) errors.push("name is required");
-  if (!body.description?.trim()) errors.push("description is required");
-  if (!body.category?.trim()) errors.push("category is required");
-  const price = Number(body.price_cents);
-  if (!Number.isInteger(price) || price <= 0) errors.push("price_cents must be a positive integer");
-  if (!/^#[0-9a-fA-F]{6}$/.test(body.swatch || "")) errors.push("swatch must be a hex colour like #2e4b3f");
-  if (
-    !Array.isArray(body.colors) ||
-    body.colors.length === 0 ||
-    body.colors.some((c) => !c.name || !/^#[0-9a-fA-F]{6}$/.test(c.hex || ""))
-  )
-    errors.push("colors must be a non-empty array of {name, hex}");
-  else if (body.colors.some((c) => !String(c.image || "").trim()))
-    errors.push("each colour must have a product image");
-  if (!Array.isArray(body.sizes) || body.sizes.length === 0 || body.sizes.some((s) => !String(s).trim()))
-    errors.push("sizes must be a non-empty array of strings");
-  const stock = Number(body.stock);
-  if (!Number.isInteger(stock) || stock < 0) errors.push("stock must be a non-negative integer");
-  if (body.compare_at_cents != null && body.compare_at_cents !== "") {
-    const cmp = Number(body.compare_at_cents);
-    if (!Number.isInteger(cmp) || cmp <= price) errors.push("compare_at_cents must be an integer greater than price");
-  }
-  return errors;
-}
-
-const productFields = (b) => ({
-  name: b.name.trim(),
-  description: b.description.trim(),
-  category: b.category.trim(),
-  price_cents: Number(b.price_cents),
-  compare_at_cents: b.compare_at_cents ? Number(b.compare_at_cents) : null,
-  swatch: b.swatch.toLowerCase(),
-  // Hero image: use the explicit one, otherwise fall back to the first colour's
-  // photo so every product always ships with a real image (no placeholders).
-  image: b.image?.trim() || b.colors?.find((c) => c.image?.trim())?.image?.trim() || null,
-  colors: b.colors.map((c) => ({
-    name: String(c.name).trim(),
-    hex: String(c.hex).toLowerCase(),
-    image: String(c.image || "").trim() || null,
-  })),
-  sizes: b.sizes.map((s) => String(s).trim()),
-  fabric: b.fabric?.trim() || null,
-  featured: !!b.featured,
-  stock: Number(b.stock),
-});
 
 router.post("/products", async (req, res, next) => {
   try {
@@ -359,6 +431,10 @@ router.put("/products/:id", async (req, res, next) => {
     if (existing.name !== previousName || !existing.slug) {
       existing.slug = await uniqueSlug(existing.name, existing._id);
     }
+    // Restocked past the threshold: reset the alert clock so the daily
+    // reminder stops, and a future dip alerts immediately rather than
+    // waiting out the old 24h window.
+    if (existing.stock > LOW_STOCK_THRESHOLD) existing.low_stock_alert_at = null;
     await existing.save();
     res.json({ product: existing });
   } catch (err) {

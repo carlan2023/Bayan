@@ -1,5 +1,6 @@
 import { NavLink, Link, Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "../store";
+import Notifications from "./Notifications";
 import "./admin.css";
 
 export default function AdminLayout() {
@@ -27,8 +28,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/products">Products</NavLink>
           <NavLink to="/admin/orders">Orders</NavLink>
           <NavLink to="/admin/customers">Customers</NavLink>
+          <NavLink to="/admin/storefront">Storefront</NavLink>
           <NavLink to="/">← View store</NavLink>
         </nav>
+        <Notifications variant="sidebar" />
         <div className="side-foot">
           <div className="who">{user.name}</div>
           <button onClick={logout}>Sign out</button>

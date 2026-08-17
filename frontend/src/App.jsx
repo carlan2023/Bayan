@@ -15,6 +15,7 @@ import AdminDashboard from "./admin/Dashboard";
 import AdminProducts from "./admin/Products";
 import AdminOrders from "./admin/Orders";
 import AdminCustomers from "./admin/Customers";
+import AdminStorefront from "./admin/Storefront";
 import NotFound from "./pages/NotFound";
 
 function ShopLayout() {
@@ -57,6 +58,7 @@ export default function App() {
                   <Route path="products" element={<AdminProducts />} />
                   <Route path="orders" element={<AdminOrders />} />
                   <Route path="customers" element={<AdminCustomers />} />
+                  <Route path="storefront" element={<AdminStorefront />} />
                 </Route>
               </Routes>
             </BrowserRouter>

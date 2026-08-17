@@ -12,6 +12,7 @@ const DEFAULT_CONFIG = {
   free_delivery_threshold_cents: 20000000,
   delivery_fee_cents: 1000000,
   max_qty_per_line: 20,
+  urgency_stock_threshold: 3,
 };
 
 const ConfigContext = createContext(DEFAULT_CONFIG);

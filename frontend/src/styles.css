@@ -251,6 +251,10 @@ img, svg { display: block; max-width: 100%; }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* PDP enquiry button */
+.btn-wa { background: #25d366; color: #fff; }
+.btn-wa:hover { background: #1da851; color: #fff; }
+
 /* ---------- Hero ---------- */
 .hero {
   background: linear-gradient(120deg, var(--pine-dark) 0%, var(--pine) 65%, #3d5c4e 100%);
@@ -270,6 +274,37 @@ img, svg { display: block; max-width: 100%; }
   height: 420px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(201, 162, 75, 0.35), transparent 70%);
+}
+/* An admin-set photo or video fills the whole banner. The decorative circle
+   would fight with real imagery, so it steps aside. */
+.hero.has-media::after { display: none; }
+.hero-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+/* Keeps the heading and CTA legible over any photo. */
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    120deg,
+    rgba(34, 58, 48, 0.88),
+    rgba(34, 58, 48, 0.55) 55%,
+    rgba(34, 58, 48, 0.25)
+  );
+}
+.hero-content { position: relative; z-index: 2; }
+@media (max-width: 720px) {
+  .hero { padding: 56px 28px; }
+  /* Photos need a darker wash at this width — the copy spans the full card. */
+  .hero.has-media .hero-scrim {
+    background: linear-gradient(180deg, rgba(34, 58, 48, 0.72), rgba(34, 58, 48, 0.88));
+  }
 }
 .hero .eyebrow {
   color: var(--gold);
@@ -343,6 +378,13 @@ img, svg { display: block; max-width: 100%; }
   .wish-btn { width: 40px; height: 40px; }
 }
 
+/* Product-card enquiry icon: shares .wish-btn's chrome, sits under the heart. */
+.wa-btn { top: 54px; }
+.wa-btn:hover { color: #1da851; border-color: #25d366; }
+@media (pointer: coarse) {
+  .wa-btn { top: 60px; }
+}
+
 .card-img {
   border-radius: var(--radius);
   overflow: hidden;
@@ -364,6 +406,50 @@ img, svg { display: block; max-width: 100%; }
   border-radius: 999px;
   padding: 4px 12px;
 }
+/* Scarcity cue on the card image — sits along the bottom so it never
+   collides with the Sale badge or the wishlist/WhatsApp buttons. */
+.stock-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  background: rgba(31, 42, 36, 0.82);
+  color: #f3eee0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 7px 10px;
+  backdrop-filter: blur(2px);
+}
+
+/* Product page: a louder line above the description. */
+.stock-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f6e4df;
+  border: 1px solid #e5c4bb;
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+.stock-alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  animation: stock-pulse 1.8s ease-in-out infinite;
+}
+@keyframes stock-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
 .card h3 { font-size: 1.05rem; font-weight: 500; font-family: var(--font-body); }
 .card .cat { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
 .price { font-weight: 500; }
@@ -508,3 +594,221 @@ select.pill { appearance: none; padding-right: 28px; }
 .auth-switch button { color: var(--clay-dark); }
 
 .spinner { text-align: center; padding: 60px; color: var(--ink-soft); }
+
+/* ---------- WhatsApp ---------- */
+.wa-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 80;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 20px rgba(20, 17, 12, 0.28);
+  transition: transform 0.25s ease, box-shadow 0.2s, opacity 0.25s ease;
+  animation: wa-enter 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes wa-enter {
+  from { transform: translateY(80px) scale(0.6); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+/* A single soft ring on arrival draws the eye without nagging forever. */
+.wa-float::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #25d366;
+  animation: wa-ring 1.6s ease-out 0.5s 2;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes wa-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
+.wa-float:hover { transform: scale(1.08); box-shadow: 0 10px 26px rgba(20, 17, 12, 0.32); }
+.wa-float:active { transform: scale(0.95); }
+/* Ducks below the viewport while the shopper is scrolling down. */
+.wa-float.wa-hidden { transform: translateY(110px); opacity: 0; pointer-events: none; }
+@media (max-width: 900px) {
+  .wa-float { bottom: 18px; right: 16px; width: 52px; height: 52px; }
+}
+
+/* ================= Notifications ================= */
+.notif-bell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #c5bfab;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  position: relative;
+  margin-bottom: 10px;
+  transition: background 0.12s, color 0.12s;
+}
+.notif-bell:hover { background: rgba(255, 255, 255, 0.06); color: #f3eee0; }
+.notif-badge {
+  margin-left: auto;
+  background: var(--clay);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  animation: notif-pop 0.25s ease;
+}
+@keyframes notif-pop {
+  0% { transform: scale(0.5); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.notif-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 14, 11, 0.35);
+  z-index: 90;
+}
+.notif-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 92vw);
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 32px rgba(20, 17, 12, 0.14);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  animation: notif-slide 0.22s ease;
+}
+@keyframes notif-slide {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.notif-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.notif-head h3 { font-size: 1.15rem; margin-right: auto; }
+.notif-close { background: none; border: none; color: var(--ink-soft); font-size: 1rem; padding: 4px 8px; }
+.notif-close:hover { color: var(--ink); }
+
+.notif-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+.notif-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-body);
+  padding: 14px 18px;
+  position: relative;
+  transition: background 0.12s;
+}
+.notif-item:hover { background: var(--pine-tint); }
+.notif-item.unread { background: #fdf8ec; }
+.notif-item.unread:hover { background: var(--pine-tint); }
+
+.notif-medallion {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+  border: 1px solid var(--line);
+}
+.n-order { background: #f3ead3; color: var(--clay-dark); border-color: var(--gold); }
+.n-wish { background: #f6e7e2; color: #a4483a; }
+.n-low { background: #f0e3c0; color: #7a5d18; }
+.n-out { background: #f2dcd7; color: var(--danger); font-weight: 600; }
+.n-customer { background: var(--pine-tint); color: var(--ink); }
+
+.notif-content { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-title { font-size: 0.92rem; font-weight: 500; color: var(--ink); }
+.notif-body { font-size: 0.84rem; color: var(--ink-soft); }
+.notif-time { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-top: 3px; }
+.notif-dot {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--clay);
+}
+
+.notif-empty { text-align: center; color: var(--ink-soft); padding: 60px 30px; font-size: 0.94rem; }
+.notif-empty-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  color: var(--clay-dark);
+  font-size: 1.2rem;
+}
+
+@media (max-width: 760px) {
+  .notif-bell.in-sidebar { width: auto; margin-bottom: 0; }
+  .notif-bell.in-sidebar > span:not(.notif-badge) { display: none; }
+  .notif-bell.in-sidebar .notif-badge { position: absolute; top: 0; right: 0; margin: 0; }
+}
+
+/* Header variant: icon-only, sits with the other header actions and inherits
+   the light chrome rather than the admin sidebar's dark palette. */
+.notif-bell.in-header {
+  width: auto;
+  margin-bottom: 0;
+  padding: 6px 2px;
+  gap: 0;
+  color: var(--ink);
+  border-radius: 0;
+}
+.notif-bell.in-header:hover { background: none; color: var(--clay-dark); }
+.notif-bell.in-header > span:not(.notif-badge) { display: none; }
+.notif-bell.in-header .notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  margin: 0;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.66rem;
+}
+/* Unread work waiting: a soft pulse so it reads at a glance mid-browse. */
+.notif-bell.in-header.has-unread svg { animation: bell-nudge 2.6s ease-in-out infinite; transform-origin: top center; }
+@keyframes bell-nudge {
+  0%, 88%, 100% { transform: rotate(0deg); }
+  91% { transform: rotate(11deg); }
+  94% { transform: rotate(-9deg); }
+  97% { transform: rotate(5deg); }
+}
+@media (max-width: 900px) and (pointer: coarse) {
+  .notif-bell.in-header { min-width: 44px; min-height: 44px; justify-content: center; }
+}
