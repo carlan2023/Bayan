@@ -17,6 +17,20 @@ export function signToken(user) {
   });
 }
 
+/**
+ * True when a JWT was minted before the account's last password reset.
+ * Checked wherever the user row is already loaded (/auth/me, the admin gate),
+ * so a reset revokes older sessions without a token blocklist. `iat` is whole
+ * seconds, so allow one second of slack for a token minted in the same tick as
+ * the change (the reset endpoint signs one immediately).
+ */
+export const issuedBeforePasswordChange = (claims, user) =>
+  Boolean(
+    user?.password_changed_at &&
+      claims?.iat &&
+      claims.iat * 1000 < new Date(user.password_changed_at).getTime() - 1000
+  );
+
 /** Attaches req.user if a valid Bearer token is present; never rejects. */
 export function optionalAuth(req, _res, next) {
   const header = req.headers.authorization || "";
