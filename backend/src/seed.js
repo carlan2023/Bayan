@@ -1,4 +1,5 @@
 import { connectDB, disconnectDB, Product } from "./db.js";
+import { defaultSku, totalStock } from "./variants.js";
 
 const CLOTHING_SIZES = ["XS", "S", "M", "L", "XL"];
 const KID_SIZES = ["2-3y", "4-5y", "6-7y", "8-9y"];
@@ -140,8 +141,25 @@ const docs = () =>
     sizes: p.sizes,
     fabric: p.fabric || null,
     featured: !!p.featured,
-    stock: 30 + Math.floor(Math.random() * 40),
+    ...seedVariants(slugify(p.name), p),
   }));
+
+/**
+ * Per-size/colour stock (SCALING.md M7). Roughly one pair in seven starts sold
+ * out so the storefront shows disabled options out of the box. insertMany
+ * skips save hooks, so the derived total is computed here.
+ */
+function seedVariants(slug, p) {
+  const variants = [];
+  let i = 0;
+  for (const c of p.colors) {
+    for (const size of p.sizes) {
+      const stock = i++ % 7 === 3 ? 0 : 3 + Math.floor(Math.random() * 10);
+      variants.push({ size, color: c.name, sku: defaultSku(slug, size, c.name), stock, price_cents: null });
+    }
+  }
+  return { variants, stock: totalStock(variants) };
+}
 
 async function main() {
   await connectDB();

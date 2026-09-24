@@ -2,12 +2,18 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import multer from "multer";
-import { User, Product, Order, Notification, Setting, ORDER_STATUSES } from "../db.js";
-import { requireAuth } from "../auth.js";
-import { isAllowedImage, isAllowedHeroMedia, isAllowedVideo, uploadFilename } from "../uploads.js";
-import { slugify, validateProduct, productFields } from "../product-fields.js";
+import { User, Product, Order, Notification, Setting, ORDER_STATUSES, notify } from "../db.js";
+import { requireAuth, issuedBeforePasswordChange } from "../auth.js";
+import { claimsImage, claimsHeroMedia, finaliseUpload } from "../uploads.js";
+import { slugify, validateProduct, productFields, variantFields } from "../product-fields.js";
 import { LOW_STOCK_THRESHOLD } from "../config.js";
+import { variantLabel } from "../variants.js";
+import { restoreStock } from "../inventory.js";
+import { audit, AuditLog, AUDIT_ACTIONS, priceSnapshot, samePrices } from "../audit.js";
+import { AuthToken, issueToken, INVITE_TTL_MS } from "../auth-tokens.js";
+import { sendEmail, appUrl, emailEnabled, escapeHtml } from "../mailer.js";
 
 const router = Router();
 
@@ -15,54 +21,53 @@ const router = Router();
 // volume mount (UPLOAD_DIR=/data/uploads) so files survive redeploys; locally it
 // falls back to backend/uploads. server.js serves this directory at /uploads.
 export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve("uploads");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Unverified uploads land here first. express.static ignores dot-directories,
+// so nothing in it is ever served; finaliseUpload() sniffs each file and
+// renames it into UPLOAD_DIR (same filesystem, so the move is atomic).
+const INCOMING_DIR = path.join(UPLOAD_DIR, ".incoming");
+fs.mkdirSync(INCOMING_DIR, { recursive: true });
+
+const incomingStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, INCOMING_DIR),
+  // Random and extensionless: neither the client's filename nor its claimed
+  // type ever reaches the stored name — see src/uploads.js for why.
+  filename: (_req, _file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}.part`),
+});
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-    // Name and extension are derived from the mimetype allowlist, never from
-    // the client's filename — see src/uploads.js for why.
-    filename: (_req, file, cb) => {
-      try {
-        cb(null, uploadFilename(file.mimetype));
-      } catch (err) {
-        cb(err);
-      }
-    },
-  }),
+  storage: incomingStorage,
   limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 10 }, // 5 MB
+  // Early reject only; the real decision is made from the file's bytes.
   fileFilter: (_req, file, cb) =>
-    isAllowedImage(file.mimetype)
-      ? cb(null, true)
-      : cb(new Error("Only JPEG, PNG, WebP, GIF or AVIF images are allowed")),
+    claimsImage(file.mimetype) ? cb(null, true) : cb(new Error("Only JPEG, PNG or WebP images are allowed")),
 });
 
 // Hero banner media: images or short videos. Videos can't be compressed in the
 // browser the way photos are, so the cap is far higher than product images.
 const heroUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-    filename: (_req, file, cb) => {
-      try {
-        cb(null, uploadFilename(file.mimetype));
-      } catch (err) {
-        cb(err);
-      }
-    },
-  }),
+  storage: incomingStorage,
   limits: { fileSize: 60 * 1024 * 1024, files: 1, fields: 10 }, // 60 MB
   fileFilter: (_req, file, cb) =>
-    isAllowedHeroMedia(file.mimetype)
+    claimsHeroMedia(file.mimetype)
       ? cb(null, true)
-      : cb(new Error("Only images (JPEG, PNG, WebP, GIF, AVIF) or videos (MP4, WebM, MOV) are allowed")),
+      : cb(new Error("Only images (JPEG, PNG, WebP) or videos (MP4, WebM, MOV) are allowed")),
 });
 
-/** Admin gate: valid JWT + is_admin re-checked against the DB on every request. */
+/**
+ * Admin gate: valid JWT + is_admin re-checked against the DB on every request,
+ * and the session must post-date the account's last password reset — so
+ * resetting a leaked admin password immediately locks out the old token.
+ */
 function requireAdmin(req, res, next) {
   requireAuth(req, res, async () => {
     try {
-      const u = await User.findById(req.user.id).select("is_admin");
+      const u = await User.findById(req.user.id).select("is_admin email password_changed_at");
       if (!u?.is_admin) return res.status(403).json({ error: "Admin access required" });
+      if (issuedBeforePasswordChange(req.user, u)) {
+        return res.status(401).json({ error: "Your password was changed. Please sign in again." });
+      }
+      // Audit entries use the current address, not the one baked into the JWT.
+      req.user.email = u.email;
       next();
     } catch (err) {
       next(err);
@@ -92,16 +97,33 @@ const clampNum = (v, min, max, fallback) => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 };
 
-router.post("/hero/upload", (req, res) => {
-  heroUpload.single("file")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.status(201).json({
-      url: `/uploads/${req.file.filename}`,
-      media_type: isAllowedVideo(req.file.mimetype) ? "video" : "image",
+/**
+ * Run a multer middleware, then sniff and publish the file. Responds itself;
+ * `kinds` is what this endpoint accepts (["image"] or ["image", "video"]).
+ */
+function handleUpload(middleware, kinds, respond) {
+  return (req, res, next) => {
+    middleware(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      try {
+        const stored = await finaliseUpload(req.file.path, UPLOAD_DIR, kinds);
+        res.status(201).json(respond(stored));
+      } catch (e) {
+        if (e.status === 400) return res.status(400).json({ error: e.message });
+        next(e);
+      }
     });
-  });
-});
+  };
+}
+
+router.post(
+  "/hero/upload",
+  handleUpload(heroUpload.single("file"), ["image", "video"], (f) => ({
+    url: `/uploads/${f.filename}`,
+    media_type: f.kind,
+  }))
+);
 
 router.put("/hero", async (req, res, next) => {
   try {
@@ -274,9 +296,32 @@ router.get("/stats", async (_req, res, next) => {
       ])
     ).map((r) => ({ category: r._id, revenue_cents: r.revenue_cents, units: r.units }));
 
-    const low_stock = (await Product.find({ stock: { $lte: 10 } }).sort({ stock: 1 }).limit(8)).map(
-      (p) => ({ id: p._id, name: p.name, category: p.category, stock: p.stock })
-    );
+    // Per size/colour: a product with 60 units can still be sold out in M.
+    const low_stock = (
+      await Product.aggregate([
+        { $unwind: "$variants" },
+        { $match: { "variants.stock": { $lte: 10 } } },
+        { $sort: { "variants.stock": 1, name: 1 } },
+        { $limit: 8 },
+        {
+          $project: {
+            name: 1,
+            category: 1,
+            size: "$variants.size",
+            color: "$variants.color",
+            sku: "$variants.sku",
+            stock: "$variants.stock",
+          },
+        },
+      ])
+    ).map((r) => ({
+      id: r._id,
+      name: r.name,
+      category: r.category,
+      variant: variantLabel(r),
+      sku: r.sku || null,
+      stock: r.stock,
+    }));
 
     const recent_orders = (await Order.find().sort({ created_at: -1 }).limit(8)).map((o) => ({
       id: o._id,
@@ -346,15 +391,48 @@ router.patch("/orders/:id", async (req, res, next) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    // Return stock when an order is cancelled (once)
-    if (status === "cancelled" && order.status !== "cancelled") {
-      await Promise.all(
-        order.items.map((i) => Product.updateOne({ _id: i.product }, { $inc: { stock: i.qty } }))
-      );
+    const previous = order.status;
+    if (previous === status) return res.json({ order, restock_skipped: [] });
+
+    // Claim the transition with a conditional write before touching stock: two
+    // admins cancelling the same order at once must restock it exactly once.
+    const updated = await Order.findOneAndUpdate(
+      { _id: order._id, status: previous },
+      { $set: { status } },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(409).json({ error: "This order was just changed by someone else — reload and try again." });
     }
-    order.status = status;
-    await order.save();
-    res.json({ order });
+
+    // Return stock to the exact size/colour when an order is cancelled (once).
+    let restock_skipped = [];
+    if (status === "cancelled") {
+      const skipped = await restoreStock(
+        order.items.map((i) => ({ product_id: i.product, size: i.size, color: i.color, qty: i.qty, name: i.name }))
+      );
+      restock_skipped = skipped.map((s) => ({ name: s.name, variant: variantLabel(s), qty: s.qty }));
+      if (skipped.length) {
+        // The variant was removed since the order was placed; don't guess
+        // where the units should go — tell a human.
+        notify(
+          "stock_low",
+          `Order #${order.number} cancelled: ${skipped.length} line(s) not restocked`,
+          restock_skipped.map((s) => `${s.qty} × ${s.name} (${s.variant})`).join(", ") +
+            " — that size/colour no longer exists. Adjust stock by hand.",
+          "/admin/products"
+        );
+      }
+    }
+
+    await audit(req.user, "order.status", {
+      target_type: "order",
+      target_id: order._id,
+      summary: `Order #${order.number}: ${previous} → ${status}`,
+      before: { status: previous },
+      after: { status, ...(restock_skipped.length ? { restock_skipped } : {}) },
+    });
+    res.json({ order: updated, restock_skipped });
   } catch (err) {
     next(err);
   }
@@ -404,9 +482,17 @@ router.post("/products", async (req, res, next) => {
   try {
     const errors = validateProduct(req.body || {});
     if (errors.length) return res.status(400).json({ error: errors.join("; ") });
+    const slug = await uniqueSlug(req.body.name);
     const product = await Product.create({
       ...productFields(req.body),
-      slug: await uniqueSlug(req.body.name),
+      variants: variantFields(req.body, { slug }),
+      slug,
+    });
+    await audit(req.user, "product.create", {
+      target_type: "product",
+      target_id: product._id,
+      summary: `Created "${product.name}"`,
+      after: priceSnapshot(product),
     });
     res.status(201).json({ product });
   } catch (err) {
@@ -427,15 +513,32 @@ router.put("/products/:id", async (req, res, next) => {
     // Capture the old name first: Object.assign below overwrites existing.name,
     // so comparing against it afterwards would never detect a rename.
     const previousName = existing.name;
+    const pricesBefore = priceSnapshot(existing);
+    const previousVariants = existing.variants.map((v) => v.toObject());
     Object.assign(existing, productFields(req.body));
     if (existing.name !== previousName || !existing.slug) {
       existing.slug = await uniqueSlug(existing.name, existing._id);
     }
-    // Restocked past the threshold: reset the alert clock so the daily
-    // reminder stops, and a future dip alerts immediately rather than
-    // waiting out the old 24h window.
-    if (existing.stock > LOW_STOCK_THRESHOLD) existing.low_stock_alert_at = null;
+    // Each variant keeps its alert clock unless it was restocked past the
+    // threshold, which resets it so the daily reminder stops and a future dip
+    // alerts immediately rather than waiting out the old 24h window.
+    existing.variants = variantFields(req.body, {
+      slug: existing.slug,
+      previous: previousVariants,
+      threshold: LOW_STOCK_THRESHOLD,
+    });
     await existing.save();
+
+    const pricesAfter = priceSnapshot(existing);
+    if (!samePrices(pricesBefore, pricesAfter)) {
+      await audit(req.user, "product.price", {
+        target_type: "product",
+        target_id: existing._id,
+        summary: `Price change on "${existing.name}"`,
+        before: pricesBefore,
+        after: pricesAfter,
+      });
+    }
     res.json({ product: existing });
   } catch (err) {
     next(err);
@@ -452,7 +555,11 @@ router.delete("/products/:id", async (req, res, next) => {
 
     const hasOrders = await Order.exists({ "items.product": existing._id });
     if (hasOrders) {
-      // Keep order history intact — hide from the store instead
+      // Keep order history intact — hide from the store instead. Zero every
+      // variant; the derived total follows on save.
+      existing.variants.forEach((v) => {
+        v.stock = 0;
+      });
       existing.stock = 0;
       existing.featured = false;
       await existing.save();
@@ -470,13 +577,10 @@ router.delete("/products/:id", async (req, res, next) => {
 
 /* ================= Image upload ================= */
 
-router.post("/uploads", (req, res) => {
-  upload.single("file")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.status(201).json({ url: `/uploads/${req.file.filename}` });
-  });
-});
+router.post(
+  "/uploads",
+  handleUpload(upload.single("file"), ["image"], (f) => ({ url: `/uploads/${f.filename}` }))
+);
 
 /* ================= Customers ================= */
 
@@ -509,6 +613,170 @@ router.get("/customers", async (_req, res, next) => {
       ])
     ).map((c) => ({ ...c, id: c._id, _id: undefined }));
     res.json({ customers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ================= Team (admins + invites) ================= */
+
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.get("/team", async (_req, res, next) => {
+  try {
+    const [admins, invites] = await Promise.all([
+      User.find({ is_admin: true }).select("name email created_at").sort({ created_at: 1 }),
+      AuthToken.find({ kind: "admin_invite", used_at: null, expires_at: { $gt: new Date() } })
+        .sort({ created_at: -1 })
+        .populate("created_by", "name email"),
+    ]);
+    res.json({
+      admins: admins.map((u) => ({ id: u._id.toString(), name: u.name, email: u.email, created_at: u.created_at })),
+      invites: invites.map((i) => ({
+        id: i._id.toString(),
+        email: i.email,
+        name: i.name,
+        expires_at: i.expires_at,
+        created_at: i.created_at,
+        invited_by: i.created_by ? i.created_by.name || i.created_by.email : null,
+      })),
+      email_enabled: emailEnabled(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Invite a second (third, …) admin. Previously `is_admin` could only be set by
+ * the boot-time bootstrap or by hand in the database.
+ *
+ * The accept link is returned to the inviting admin as well as emailed: with
+ * no email provider configured it is the only way to deliver it, and the
+ * inviter is already an admin, so handing them the link grants nothing new.
+ */
+router.post("/invites", async (req, res, next) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const name = String(req.body?.name || "").trim() || null;
+    if (!EMAIL_RX.test(email)) return res.status(400).json({ error: "A valid email address is required" });
+    if (await User.exists({ email, is_admin: true })) {
+      return res.status(409).json({ error: "That person is already an admin" });
+    }
+    const base = appUrl();
+    if (!base) {
+      return res.status(503).json({ error: "APP_URL is not set on the server, so an invite link can't be built." });
+    }
+
+    const { raw, doc } = await issueToken("admin_invite", {
+      email,
+      name,
+      created_by: req.user.id,
+      ttlMs: INVITE_TTL_MS,
+    });
+    const accept_url = `${base}/accept-invite?token=${encodeURIComponent(raw)}`;
+
+    let emailed = false;
+    if (emailEnabled()) {
+      try {
+        const r = await sendEmail({
+          to: email,
+          subject: "You've been invited to help run the shop",
+          text:
+            `${req.user.name || req.user.email} has invited you to be an admin of the shop.\n\n` +
+            `Accept the invite here. The link works once and expires in 7 days:\n${accept_url}\n\n` +
+            "If you weren't expecting this, you can ignore it.",
+          html:
+            `<p>${escapeHtml(req.user.name || req.user.email)} has invited you to be an admin of the shop.</p>` +
+            `<p><a href="${escapeHtml(accept_url)}">Accept the invite</a>. The link works once and expires in 7 days.</p>` +
+            "<p>If you weren't expecting this, you can ignore it.</p>",
+        });
+        emailed = Boolean(r?.sent);
+      } catch (err) {
+        console.error("Failed to send admin invite email:", err.message);
+      }
+    }
+
+    await audit(req.user, "admin.invite", {
+      target_type: "invite",
+      target_id: doc._id,
+      summary: `Invited ${email} to be an admin`,
+      after: { email, expires_at: doc.expires_at },
+    });
+    res.status(201).json({
+      invite: { id: doc._id.toString(), email, name, expires_at: doc.expires_at },
+      accept_url,
+      emailed,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete("/invites/:id", async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid invite id" });
+    const invite = await AuthToken.findOneAndDelete({ _id: req.params.id, kind: "admin_invite", used_at: null });
+    if (!invite) return res.status(404).json({ error: "Invite not found (it may already have been accepted)" });
+    await audit(req.user, "admin.invite_revoke", {
+      target_type: "invite",
+      target_id: invite._id,
+      summary: `Revoked the admin invite for ${invite.email}`,
+      before: { email: invite.email },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Remove someone's admin rights (their customer account and order history
+ * stay). Refuses to demote yourself or the last admin — either would leave a
+ * shop that can lock itself out with one click.
+ */
+router.delete("/team/:id", async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid user id" });
+    if (req.params.id === String(req.user.id)) {
+      return res.status(400).json({ error: "You can't remove your own admin access. Ask another admin." });
+    }
+    if ((await User.countDocuments({ is_admin: true })) <= 1) {
+      return res.status(400).json({ error: "A shop must keep at least one admin." });
+    }
+    const u = await User.findOneAndUpdate(
+      { _id: req.params.id, is_admin: true },
+      { $set: { is_admin: false } },
+      { new: true }
+    );
+    if (!u) return res.status(404).json({ error: "Admin not found" });
+    await audit(req.user, "admin.demote", {
+      target_type: "user",
+      target_id: u._id,
+      summary: `Removed admin access from ${u.email}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ================= Audit log ================= */
+
+router.get("/audit", async (req, res, next) => {
+  try {
+    const filter = {};
+    if (AUDIT_ACTIONS.includes(req.query.action)) filter.action = req.query.action;
+    if (req.query.target_type && req.query.target_id) {
+      filter.target_type = String(req.query.target_type);
+      filter.target_id = String(req.query.target_id);
+    }
+    const { page, limit, skip } = paging(req.query, { defaultLimit: 25 });
+    const [entries, total] = await Promise.all([
+      AuditLog.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
+      AuditLog.countDocuments(filter),
+    ]);
+    res.json({ entries, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
   } catch (err) {
     next(err);
   }

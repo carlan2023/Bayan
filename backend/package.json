@@ -12,6 +12,7 @@
     "start": "node src/server.js",
     "seed": "node src/seed.js",
     "migrate:remove-imageless": "node src/migrate-remove-imageless.js",
+    "migrate:variants": "node src/migrate-variants.js",
     "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
@@ -26,5 +27,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "mongodb-memory-server-core": "^11.3.0"
   }
 }

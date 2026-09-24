@@ -31,5 +31,6 @@ COPY --from=build /app/backend ./
 
 EXPOSE 8080
 
-# Seed is idempotent (skips if products exist); then start the server.
-CMD ["sh", "-c", "node src/seed.js && node src/server.js"]
+# Seed is idempotent (skips if products exist); the variants migration is too
+# (it only touches products with no variants yet). Then start the server.
+CMD ["sh", "-c", "node src/seed.js && node src/migrate-variants.js && node src/server.js"]
