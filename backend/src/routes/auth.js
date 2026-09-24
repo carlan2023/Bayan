@@ -36,13 +36,19 @@ const registerLimiter = rateLimit({
  * can send an email, so an open endpoint is a way to spam any inbox from our
  * domain (and burn the sending reputation the shop's real mail depends on).
  */
-const passwordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: { error: "Too many attempts. Please wait a few minutes and try again." },
-});
+const passwordLimiter = (limit) =>
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { error: "Too many attempts. Please wait a few minutes and try again." },
+  });
+// Separate budgets, so opening an invite page doesn't eat into the attempts
+// for accepting it. Each is a guess at "more than a person would ever need".
+const forgotLimiter = passwordLimiter(5);
+const resetLimiter = passwordLimiter(10);
+const inviteLimiter = passwordLimiter(20);
 
 const BCRYPT_ROUNDS = 10;
 const MIN_PASSWORD = 6;
@@ -117,7 +123,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
 const GENERIC_FORGOT =
   "If an account exists for that email, we've sent a link to reset its password. It expires in 1 hour.";
 
-router.post("/forgot", passwordLimiter, async (req, res, next) => {
+router.post("/forgot", forgotLimiter, async (req, res, next) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
     if (!email) return res.status(400).json({ error: "Email is required" });
@@ -157,7 +163,7 @@ router.post("/forgot", passwordLimiter, async (req, res, next) => {
   }
 });
 
-router.post("/reset", passwordLimiter, async (req, res, next) => {
+router.post("/reset", resetLimiter, async (req, res, next) => {
   try {
     const { token, password } = req.body || {};
     if (!password || String(password).length < MIN_PASSWORD) {
@@ -195,7 +201,7 @@ router.post("/reset", passwordLimiter, async (req, res, next) => {
 /* ================= Admin invites (acceptance side) ================= */
 
 /** What the accept page needs to render: who the invite is for. */
-router.get("/invite", passwordLimiter, async (req, res, next) => {
+router.get("/invite", inviteLimiter, async (req, res, next) => {
   try {
     const invite = await findLiveToken("admin_invite", req.query.token);
     if (!invite) return res.status(404).json({ error: "This invite is invalid, already used or expired." });
@@ -217,7 +223,7 @@ router.get("/invite", passwordLimiter, async (req, res, next) => {
  * invite must not become a way for one admin to set a customer's password and
  * take the account over.
  */
-router.post("/accept-invite", passwordLimiter, async (req, res, next) => {
+router.post("/accept-invite", resetLimiter, async (req, res, next) => {
   try {
     const { token, name, password } = req.body || {};
     if (!password || String(password).length < MIN_PASSWORD) {
