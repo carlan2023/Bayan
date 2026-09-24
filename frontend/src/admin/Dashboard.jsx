@@ -3,13 +3,8 @@ import { Link } from "react-router-dom";
 import { api, fmtPrice } from "../api";
 import { BarChart, Donut } from "./Charts";
 
-const STATUS_COLORS = {
-  pending: "#c9a24b",
-  confirmed: "#7b8fa3",
-  dispatched: "#8a6fa8",
-  delivered: "#2e4b3f",
-  cancelled: "#a4483a",
-};
+// Resolved by CSS (admin.css --status-*), so the donut follows the shop's palette.
+const statusColor = (status) => `var(--status-${status}, var(--chart-5))`;
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -73,7 +68,7 @@ export default function Dashboard() {
             segments={orders_by_status.map((s) => ({
               label: s.status,
               value: s.count,
-              color: STATUS_COLORS[s.status],
+              color: statusColor(s.status),
             }))}
           />
         </div>

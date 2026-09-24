@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, fmtPrice } from "../api";
 import { compressImage } from "../imageCompress";
 import Pager from "./Pager";
+import { cssVar } from "../theme";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
@@ -12,13 +13,23 @@ const emptyForm = {
   compare_at: "",
   description: "",
   fabric: "",
-  swatch: "#2e4b3f",
+  swatch: "",
   image: "",
-  colors: [{ name: "", hex: "#2e4b3f", image: "" }],
+  colors: [{ name: "", hex: "", image: "" }],
   sizes: "XS, S, M, L, XL",
   stock: "40",
   featured: false,
 };
+
+/**
+ * A blank form whose colour pickers start on the shop's primary colour.
+ * <input type="color"> needs a concrete hex, so the token is read at the moment
+ * the form opens — after any runtime retheme — rather than baked in here.
+ */
+function newProductForm() {
+  const primary = cssVar("--pine", "#2e4b3f");
+  return { ...emptyForm, swatch: primary, colors: [{ name: "", hex: primary, image: "" }] };
+}
 
 function toForm(p) {
   return {
@@ -197,7 +208,7 @@ export default function Products() {
           <button
             className="btn btn-accent btn-sm"
             onClick={() => {
-              setForm({ ...emptyForm, colors: [{ name: "", hex: "#2e4b3f" }] });
+              setForm(newProductForm());
               setEditingId(null);
               setError("");
             }}
@@ -257,7 +268,7 @@ export default function Products() {
                 <img
                   src={form.image}
                   alt="preview"
-                  style={{ width: 64, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line, #ddd)" }}
+                  style={{ width: 64, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line)" }}
                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                 />
               ) : (
@@ -321,7 +332,7 @@ export default function Products() {
                   <img
                     src={c.image}
                     alt={c.name || "colour"}
-                    style={{ width: 48, height: 58, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line, #ddd)" }}
+                    style={{ width: 48, height: 58, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line)" }}
                     onError={(e) => { e.currentTarget.style.display = "none"; }}
                   />
                 ) : (
@@ -370,7 +381,7 @@ export default function Products() {
             <button
               type="button"
               className="link-btn"
-              onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: "#b06a4d", image: "" }] }))}
+              onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: cssVar("--clay", "#b06a4d"), image: "" }] }))}
             >
               + Add colour
             </button>
