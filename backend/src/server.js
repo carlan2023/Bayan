@@ -4,14 +4,17 @@ import helmet from "helmet";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 import { connectDB, Setting } from "./db.js";
 import { startStockAlerts } from "./stock-alerts.js";
-import { publicConfig } from "./config.js";
+import { getSettings, publicConfig } from "./config.js";
+import { renderShell } from "./shell.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
 import wishlistRoutes from "./routes/wishlist.js";
 import adminRoutes, { UPLOAD_DIR } from "./routes/admin.js";
+import adminSettingsRoutes from "./routes/admin-settings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,10 +69,23 @@ if (corsOrigins.length > 0) {
 
 app.use(express.json({ limit: "100kb" }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "bayan-api" }));
-// Storefront constants (currency, delivery pricing) — the client reads these
-// instead of hard-coding them, so quoted totals always match what we charge.
-app.get("/api/config", (_req, res) => res.json(publicConfig()));
+// Uptime monitors and Railway's healthcheck hit this. It reports the database
+// too: a process that is up but has lost Mongo cannot take an order, and a
+// monitor that only saw "ok" would never page anyone about it.
+app.get("/api/health", (_req, res) => {
+  const db = mongoose.connection.readyState === 1;
+  res.status(db ? 200 : 503).json({ ok: db, db, service: "bayan-api" });
+});
+// The shop's public settings: brand, palette, fonts, copy, departments and the
+// commerce rules (currency, delivery pricing, per-line cap). The client quotes
+// totals from these, and routes/orders.js charges from the same cached read.
+app.get("/api/config", async (_req, res, next) => {
+  try {
+    res.json(publicConfig(await getSettings()));
+  } catch (err) {
+    next(err);
+  }
+});
 // Landing-page hero media (admin-managed). Null until an admin sets one.
 app.get("/api/hero", async (_req, res, next) => {
   try {
@@ -83,6 +99,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+// Mounted before the general admin router; each applies the admin gate itself.
+app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Uploaded product images (persisted on a volume in production). nosniff stops
@@ -108,10 +126,20 @@ app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint not found
 // so the SPA and API share one origin and no CORS/proxy config is needed.
 const distDir = process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist");
 if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
-  app.get("*", (req, res, next) => {
+  // index: false — "/" must go through the personalised shell below rather
+  // than being served as the raw built file.
+  app.use(express.static(distDir, { index: false }));
+  const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+  app.get("*", async (req, res, next) => {
     if (req.path.startsWith("/api")) return next();
-    res.sendFile(path.join(distDir, "index.html")); // SPA fallback
+    try {
+      // SPA fallback, with this shop's title, theme and config written in so
+      // the first paint is already theirs (see src/shell.js).
+      const html = renderShell(indexHtml, publicConfig(await getSettings()));
+      res.set("Cache-Control", "no-cache").type("html").send(html);
+    } catch {
+      res.sendFile(path.join(distDir, "index.html")); // settings unreadable: default shell
+    }
   });
   console.log(`Serving frontend from ${distDir}`);
 }

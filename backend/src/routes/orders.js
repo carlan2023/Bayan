@@ -2,7 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { Product, Order, nextOrderNumber, notify } from "../db.js";
 import { optionalAuth, requireAuth } from "../auth.js";
-import { deliveryFor, MAX_QTY_PER_LINE, LOW_STOCK_THRESHOLD } from "../config.js";
+import { deliveryFor, getSettings, LOW_STOCK_THRESHOLD } from "../config.js";
 import { alertLowStock } from "../stock-alerts.js";
 
 const fmtUGX = (cents) => `USh ${Math.round(cents / 100).toLocaleString("en-US")}`;
@@ -39,9 +39,13 @@ router.post("/", optionalAuth, async (req, res, next) => {
       return res.status(400).json({ error: "Cart contains an invalid product — please clear it and re-add items" });
     }
 
+    // One settings snapshot prices the whole order — the same source (and the
+    // same cache) GET /api/config quoted the shopper from.
+    const settings = await getSettings();
+
     const lines = [];
     for (const item of items) {
-      const qty = Math.max(1, Math.min(parseInt(item.qty, 10) || 1, MAX_QTY_PER_LINE));
+      const qty = Math.max(1, Math.min(parseInt(item.qty, 10) || 1, settings.max_qty_per_line));
       const product = await Product.findById(item.product_id);
       if (!product) return res.status(400).json({ error: `Product ${item.product_id} not found` });
       if (product.stock < qty) {
@@ -66,7 +70,7 @@ router.post("/", optionalAuth, async (req, res, next) => {
     }
 
     const subtotal = lines.reduce((sum, l) => sum + l.product.price_cents * l.qty, 0);
-    const delivery = deliveryFor(subtotal);
+    const delivery = deliveryFor(subtotal, settings);
 
     const order = await Order.create({
       number: await nextOrderNumber(),

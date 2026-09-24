@@ -57,8 +57,12 @@ const heroUpload = multer({
       : cb(new Error("Only images (JPEG, PNG, WebP, GIF, AVIF) or videos (MP4, WebM, MOV) are allowed")),
 });
 
-/** Admin gate: valid JWT + is_admin re-checked against the DB on every request. */
-function requireAdmin(req, res, next) {
+/**
+ * Admin gate: valid JWT + is_admin re-checked against the DB on every request.
+ * Exported for the admin sub-routers mounted separately in server.js
+ * (settings, catalogue import).
+ */
+export function requireAdmin(req, res, next) {
   requireAuth(req, res, async () => {
     try {
       const u = await User.findById(req.user.id).select("is_admin");

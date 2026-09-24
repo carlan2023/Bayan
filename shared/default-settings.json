@@ -1,0 +1,67 @@
+{
+  "shop_name": "Bayan",
+  "wordmark": "Bayan",
+  "logo_url": null,
+  "page_title": "Bayan — Considered Clothing & Home",
+  "palette": {
+    "bg": "#f6f1e7",
+    "surface": "#fffdf7",
+    "ink": "#1f2a24",
+    "ink_soft": "#55604f",
+    "primary": "#2e4b3f",
+    "primary_dark": "#223a30",
+    "primary_tint": "#e4e9e1",
+    "accent": "#b06a4d",
+    "accent_dark": "#96543a",
+    "highlight": "#c9a24b",
+    "line": "#e5dccb",
+    "danger": "#a4483a"
+  },
+  "fonts": {
+    "display": "Fraunces",
+    "body": "Outfit"
+  },
+  "currency": "UGX",
+  "locale": "en-UG",
+  "free_delivery_threshold_cents": 20000000,
+  "delivery_fee_cents": 1000000,
+  "max_qty_per_line": 20,
+  "support_email": "support@bayan.example",
+  "support_phone": "",
+  "whatsapp_number": "256740399767",
+  "copy": {
+    "topbar": "Free delivery on orders over {free_delivery_threshold} · Cash on delivery available",
+    "hero": {
+      "eyebrow": "New season · SS26",
+      "headline": "Dress well. Live well.",
+      "headline_emphasis": "Pay at your door.",
+      "body": "Considered clothing, jewellery and fragrance in natural fabrics and honest colours — delivered countrywide with cash on delivery.",
+      "cta": "Shop the collection"
+    },
+    "perks": [
+      {
+        "title": "Cash on delivery",
+        "body": "Order now, pay when your parcel reaches your hands. No card required."
+      },
+      {
+        "title": "Free delivery over {free_delivery_threshold}",
+        "body": "Flat {delivery_fee} delivery on smaller orders, anywhere in the country."
+      },
+      {
+        "title": "Genuine & quality-checked",
+        "body": "Every piece — from jewellery to fragrance — is sourced authentic and inspected before it ships."
+      }
+    ],
+    "footer_tagline": "Considered clothing, jewellery and fragrance. Made to last, priced to be lived in.",
+    "footer_promises": ["Cash on delivery, countrywide", "Genuine & quality-checked"],
+    "search_placeholder": "Search {shop_name}…",
+    "signup_prompt": "New to {shop_name}?",
+    "whatsapp_greeting": "Hello {shop_name}!"
+  },
+  "departments": [
+    { "name": "Women", "colour": "#2e4b3f", "icon": "dress" },
+    { "name": "Men", "colour": "#22303a", "icon": "shirt" },
+    { "name": "Kids", "colour": "#b06a4d", "icon": "child" },
+    { "name": "Accessories", "colour": "#6e5a43", "icon": "bottle" }
+  ]
+}

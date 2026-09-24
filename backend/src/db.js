@@ -151,12 +151,77 @@ const settingSchema = new mongoose.Schema(
   { timestamps }
 );
 
+/* ---------------- Shop settings (singleton) ----------------
+   The shop's identity and commerce rules — see src/settings.js for the field
+   list, defaults and validation. One document per database, _id "shop".
+   Every path is optional: anything unset resolves to the default, so a
+   database that predates this model keeps behaving exactly as before.
+   Validation happens in settings.js before a write; the schema is only the
+   storage shape (strict, so stray keys never persist). */
+export const SETTINGS_ID = "shop";
+
+const hexField = { type: String, trim: true };
+const shopSettingsSchema = new mongoose.Schema(
+  {
+    _id: { type: String, default: SETTINGS_ID },
+    shop_name: String,
+    wordmark: String,
+    logo_url: String,
+    page_title: String,
+    palette: {
+      bg: hexField,
+      surface: hexField,
+      ink: hexField,
+      ink_soft: hexField,
+      primary: hexField,
+      primary_dark: hexField,
+      primary_tint: hexField,
+      accent: hexField,
+      accent_dark: hexField,
+      highlight: hexField,
+      line: hexField,
+      danger: hexField,
+    },
+    fonts: { display: String, body: String },
+    currency: String,
+    locale: String,
+    free_delivery_threshold_cents: Number,
+    delivery_fee_cents: Number,
+    max_qty_per_line: Number,
+    support_email: String,
+    support_phone: String,
+    whatsapp_number: String,
+    copy: {
+      topbar: String,
+      hero: {
+        eyebrow: String,
+        headline: String,
+        headline_emphasis: String,
+        body: String,
+        cta: String,
+      },
+      perks: { type: [{ _id: false, title: String, body: String }], default: undefined },
+      footer_tagline: String,
+      footer_promises: { type: [String], default: undefined },
+      search_placeholder: String,
+      signup_prompt: String,
+      whatsapp_greeting: String,
+    },
+    departments: {
+      type: [{ _id: false, name: String, colour: String, icon: String }],
+      default: undefined,
+    },
+  },
+  { timestamps, collection: "shop_settings" }
+);
+
 export const User = mongoose.model("User", userSchema);
 export const Product = mongoose.model("Product", productSchema);
 export const Order = mongoose.model("Order", orderSchema);
 export const Counter = mongoose.model("Counter", counterSchema);
 export const Notification = mongoose.model("Notification", notificationSchema);
 export const Setting = mongoose.model("Setting", settingSchema);
+export const ShopSettings = mongoose.model("ShopSettings", shopSettingsSchema);
 
 const MAX_NOTIFICATIONS = 500;
 
@@ -195,9 +260,15 @@ export async function nextOrderNumber() {
 
 /* ---------------- Bootstrap ---------------- */
 
-export async function connectDB() {
+/**
+ * Connect, and by default make sure an admin exists. Scripts that manage
+ * accounts themselves (`npm run provision`) pass bootstrapAdmin: false, or the
+ * generic ADMIN_EMAIL account would be minted before the shop owner's.
+ */
+export async function connectDB({ bootstrapAdmin = true } = {}) {
   await mongoose.connect(uri);
   console.log(`MongoDB connected (${mongoose.connection.name})`);
+  if (!bootstrapAdmin) return;
 
   // Ensure a super user exists
   const adminExists = await User.exists({ is_admin: true });
