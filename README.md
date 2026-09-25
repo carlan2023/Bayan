@@ -1,6 +1,8 @@
-# Bayan — E-commerce MVP
+# Bayan — white-label fashion storefront
 
-A Next.co.uk-inspired shopping site with a "modern boutique" identity: deep pine green on warm cream, clay accent, Fraunces (display serif) + Outfit (body) type.
+A Next.co.uk-inspired shopping site, built to run several shops from one codebase: one Docker image, and one Railway service and database per shop. Everything that makes a shop *that* shop (name, logo, palette, fonts, currency, delivery pricing, copy, departments) is a settings document the owner edits at **Admin → Settings**, not code. The default settings are Bayan's "modern boutique" identity: deep pine green on warm cream, clay accent, Fraunces (display serif) + Outfit (body) type.
+
+Onboarding a new shop: [`docs/onboarding.md`](docs/onboarding.md). Architecture and conventions: [`CLAUDE.md`](CLAUDE.md). Why it's built this way: [`SCALING.md`](SCALING.md).
 
 ## Stack
 
@@ -12,7 +14,7 @@ A Next.co.uk-inspired shopping site with a "modern boutique" identity: deep pine
 | Auth | JWT + bcryptjs (async), express-rate-limit | Stateless sessions for the SPA; credential endpoints rate-limited per IP |
 | Security | helmet (CSP), same-origin CORS, magic-number upload sniffing | See "Security" below |
 
-**Requires Node 18+** and a MongoDB instance. Locally either install MongoDB Community / run `docker run -d -p 27017:27017 mongo:7`, or point `MONGODB_URI` at a hosted DB (e.g. your Railway MongoDB or Atlas free tier). Default connection: `mongodb://localhost:27017/bayan`.
+**Requires Node 20.9+** (for sharp) and a MongoDB instance. Locally either install MongoDB Community / run `docker run -d -p 27017:27017 mongo:7`, or point `MONGODB_URI` at a hosted DB (e.g. your Railway MongoDB or Atlas free tier). Default connection: `mongodb://localhost:27017/bayan`.
 
 ## Run it
 
@@ -20,7 +22,7 @@ A Next.co.uk-inspired shopping site with a "modern boutique" identity: deep pine
 # 1. Backend (port 4000) — MongoDB must be reachable first
 cd backend
 npm install
-npm run seed     # loads 24 products (skips if collection is not empty)
+npm run seed     # demo catalogue: 24 products (skips if the collection is not empty)
 npm run dev
 
 # 2. Frontend (port 5173) — separate terminal
@@ -33,13 +35,15 @@ Open http://localhost:5173. The Vite dev server proxies `/api` to the backend.
 
 ## Features
 
-- Home with hero, departments (Women / Men / Kids / Home), featured products
+- Home with hero, the shop's departments (from settings, each with its own colour and icon), featured products
 - Catalog with category filter pills, sorting, and keyword search
 - Product pages with colour + size selection, **stock per size/colour variant** (sold-out pairs are disabled, "only 2 left in S / Forest"), optional per-variant price, related items
 - Cart (persists in localStorage) with quantity controls and delivery calculation
 - **Real checkout with Cash on Delivery** — guest or signed-in; server re-prices every line from the DB and reserves stock with guarded conditional updates (safe on standalone MongoDB, no replica set required)
 - Accounts: register/login (JWT), order history, wishlist, **password reset by email** (Resend; offered only when email is configured)
-- Free delivery over UGX 200,000, otherwise UGX 10,000 — constants live in `backend/src/config.js` and are served to the client at `GET /api/config`, so the cart can never quote a total the server won't honour
+- Currency, delivery fee, free-delivery threshold and per-line cap come from the shop's settings (Bayan: UGX, free over UGX 200,000, otherwise UGX 10,000). They are served at `GET /api/config`, and `POST /api/orders` charges from the same cached read, so the cart never quotes a total the server won't honour
+- Runtime theming: the server writes the shop's title, palette, fonts and config into `index.html` so the first paint is already theirs, and a Settings save rethemes open pages immediately
+- Uploaded photos are re-encoded to 1600/800/400px WebP and served with a `srcset`, from local disk or S3/R2
 
 ## Admin dashboard
 
@@ -49,14 +53,14 @@ Open http://localhost:5173/admin and sign in as the super user:
 - Override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars before first boot; the account is created automatically.
 - In production (`NODE_ENV=production`) the `admin123` fallback is never used: if `ADMIN_PASSWORD` is unset, a random password is generated and printed **once** to the deploy logs. Capture it then, or set `ADMIN_PASSWORD` yourself.
 
-Features: per-variant stock editor (stock, SKU and optional price for every size/colour pair), **Team** (invite more admins by email or a copyable link, revoke invites, remove access, never the last admin), **Audit log** (order-status changes, price edits, product creation, invites, password resets), analytics overview (revenue, orders, AOV, customers, 14-day revenue chart, orders-by-status and revenue-by-category donuts, top products, low stock alerts, recent orders), full product management (create / edit / delete with colour and size editors, featured flag, sale pricing), order management (filter by status, search by order number / name / phone / town, view line items, advance status: pending → confirmed → dispatched → delivered; cancelling restocks inventory), and a customer list with lifetime spend. Admin endpoints live under `/api/admin/*` and re-check the admin flag in the database on every request.
+Features: **Settings** (name, wordmark, logo, the twelve palette colours with a live preview, fonts, currency and locale, delivery pricing, contact details, every piece of site copy, departments), **Import** on the Products page (CSV/XLSX stock sheet, checked before anything is written), per-variant stock editor (stock, SKU and optional price for every size/colour pair), **Team** (invite more admins by email or a copyable link, revoke invites, remove access, never the last admin), **Audit log** (order-status changes, price edits, product creation, invites, password resets), analytics overview (revenue, orders, AOV, customers, 14-day revenue chart, orders-by-status and revenue-by-category donuts, top products, low stock alerts, recent orders), full product management (create / edit / delete with colour and size editors, featured flag, sale pricing), order management (filter by status, search by order number / name / phone / town, view line items, advance status: pending → confirmed → dispatched → delivered; cancelling restocks inventory), and a customer list with lifetime spend. Admin endpoints live under `/api/admin/*` and re-check the admin flag in the database on every request.
 
 The products and orders listings are paged server-side (25 per page, `?page=&limit=&search=`) and return `{ total, page, limit, pages }` alongside the rows — the whole catalogue and order history are reachable regardless of size.
 
 ## API
 
 ```
-GET    /api/config                 (currency + delivery pricing)
+GET    /api/config                 (shop settings: brand, palette, fonts, copy, departments, currency, delivery pricing)
 GET    /api/products?category=&search=&sort=&featured=&limit=&ids=
 GET    /api/products/categories
 GET    /api/products/:slug
@@ -85,6 +89,9 @@ GET    /api/admin/team                               (admin: admins + pending in
 POST   /api/admin/invites                            (admin: { email, name? } → accept_url)
 DELETE /api/admin/invites/:id | /api/admin/team/:id  (admin: revoke invite | remove admin access)
 GET    /api/admin/audit?action=&page=                (admin, paged)
+GET    /api/admin/settings | PUT /api/admin/settings (admin: read / validate-and-save; audited)
+POST   /api/admin/import?dry=1                       (admin, multipart CSV/XLSX; dry=1 only reports)
+GET    /api/admin/import/template                    (admin: starter CSV)
 ```
 
 Catalogue search uses a MongoDB text index on name / description / category (weighted, name highest). `$text` only matches whole words, so a partial term like `lin` falls back to an unindexed substring scan — that fallback also covers the window while the index is still building.
@@ -123,27 +130,45 @@ Stock lives on `product.variants: [{ size, color, sku, stock, price_cents? }]`, 
 | `RESEND_API_KEY` / `EMAIL_FROM` | optional | Email via Resend. Without a key, production sends nothing and hides "Forgot password?"; development prints emails to the console |
 | `CORS_ORIGIN` | optional | Comma-separated origins for a separately hosted frontend |
 | `CSP_IMG_HOSTS` | optional | Extra image hosts for the CSP |
-| `UPLOAD_DIR` | optional | Where uploads are written (Docker: `/data/uploads`) |
+| `UPLOAD_DIR` | optional | Where uploads are staged, and stored when S3 isn't configured (Docker: `/data/uploads`) |
+| `S3_BUCKET`, `S3_PUBLIC_URL` | optional | Store uploads in S3/R2 instead of on disk; objects are served from `S3_PUBLIC_URL` (added to the CSP) |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PREFIX` | with S3 | R2 needs `S3_ENDPOINT`; `S3_REGION` defaults to `auto`; `S3_PREFIX` lets shops share a bucket |
+| `SEED_DEMO` | optional | `1` loads the demo catalogue into an empty database on boot. Unset for real shops |
+| `PROVISION_OWNER_PASSWORD` | provisioning | Initial password for the owner created by `npm run provision` (otherwise generated and printed once) |
+| `SETTINGS_CACHE_MS` | optional | How long settings are cached per process (default 30000) |
+
+## Shop operations
+
+```bash
+cd backend
+npm run provision -- ../shops/acme.json         # settings + owner account + catalogue, idempotent
+npm run import:catalogue -- stock.xlsx [--dry]  # load or update the catalogue from a sheet
+npm run migrate:storage [-- --dry]              # move local uploads to S3/R2 and repoint URLs
+```
+
+The import format (one row per size/colour, products grouped by `handle`) is documented at the top of `backend/src/catalogue-import.js`; `shops/example-catalogue.csv` is a worked example. Everything is validated before anything is written.
 
 ## Deployment (Railway)
 
-CI/CD lives in `.github/workflows/ci-cd.yml`. On every push/PR to `main` it syntax-checks the backend, runs `npm test` (unit + route tests against a MongoDB 7 service container), checks the variants migration is a no-op on a fresh seed, boots the server (polling `/api/health` for readiness rather than sleeping) and smoke-tests the full API (health, catalog, search, auth, guest COD order on a real variant, per-variant stock accounting, admin stats, order status, admin gate, security headers), and builds the frontend. On pushes to `main` that pass, it deploys to Railway via the Railway CLI.
+CI/CD lives in `.github/workflows/ci-cd.yml`. On every push/PR to `main` it syntax-checks the backend, runs `npm test` (unit + route tests against a MongoDB 7 service container), checks the variants migration is a no-op on a fresh seed, boots the server (polling `/api/health` for readiness rather than sleeping) and smoke-tests the full API (health, catalog, search, auth, guest COD order on a real variant, per-variant stock accounting, admin stats, order status, admin gate, security headers), and builds the frontend. It also checks that the demo seed is opt-in, that `npm run provision` is idempotent, and that a changed delivery fee is quoted by `/api/config` and charged by `POST /api/orders`.
+
+On pushes to `main` that pass, it deploys **every shop in `shops/deploy.json`**: ring 0 (the canary) first, then ring 1 once every canary built and answered `/api/health`. `"hold": true` keeps a shop on its current release, and a manual run (*Run workflow*) can deploy named shops only. `backup.yml` takes a nightly `mongodump` of each shop and `uptime.yml` checks each shop's `/api/health` hourly. See `docs/onboarding.md`.
 
 Setup, one time:
 
-1. Create a Railway project with a service pointing at this repo. `railway.json` tells it to build the frontend, install the backend, then run seed + server as a **single service** (the backend serves the built frontend, so no CORS or proxy config is needed). `nixpacks.toml` pins Node 22.
+1. Create a Railway project with a service pointing at this repo. `railway.json` builds the `Dockerfile`: the frontend is built, the backend installed, and on boot the (opt-in) seed, the variants migration and the server run as a **single service** (the backend serves the built frontend, so no CORS or proxy config is needed).
 2. Add a **MongoDB database** to the Railway project (New → Database → MongoDB), then on the app service set `MONGODB_URI` to a reference to the database's connection string: `${{ MongoDB.MONGO_URL }}`. No volume is needed — data lives in the database service.
 3. Set service variables: `JWT_SECRET` (long random string), and optionally `ADMIN_EMAIL` / `ADMIN_PASSWORD` before the first boot.
-4. In the GitHub repo, add Actions secrets: `RAILWAY_TOKEN` (Railway account/project token) and `RAILWAY_SERVICE_ID` (from the service's settings).
+4. In the GitHub repo, add the Actions secrets named for the shop in `shops/deploy.json` (for Bayan: `RAILWAY_TOKEN` and `RAILWAY_SERVICE_ID`, plus `BAYAN_MONGODB_URI` for backups).
 
-The seed script is idempotent (skips if products exist), and `/api/health` is configured as Railway's healthcheck.
+`/api/health` is Railway's healthcheck; it answers 503 when the database is unreachable.
 
 ## Notes
 
-- Product visuals are generated SVGs derived from each product's swatch colour (fully offline). Swap `frontend/src/components/ProductImage.jsx` for `<img>` tags when real photography exists.
-- Currency is UGX; change `CURRENCY` in `backend/src/config.js` and `fmtPrice` in `frontend/src/api.js` to switch. Delivery pricing copy reads from `/api/config`, so it updates everywhere on its own.
+- Products without a photo (or whose photo fails to load) get generated art from the swatch colour and the department's icon.
+- Currency and number format are settings (`currency`, `locale`); every price goes through the `useMoney()` hook.
 - Set `JWT_SECRET`, `PORT`, `MONGODB_URI` via environment variables in production. **The server refuses to start when `NODE_ENV=production` and `JWT_SECRET` is unset** — the development fallback is published in this repo, so anyone could forge a token with it.
-- To reseed, drop the `products` collection (e.g. `mongosh bayan --eval 'db.products.drop()'`) and run `npm run seed` again.
+- To reseed the demo catalogue, run `RESEED=1 npm run seed` (drops and reinserts products).
 - Orders get sequential human-friendly numbers (#1001, #1002, …) via a counters collection.
 
 ## Structure
@@ -151,9 +176,14 @@ The seed script is idempotent (skips if products exist), and `/api/health` is co
 ```
 backend/
   src/server.js          Express app
-  src/config.js          Currency + delivery constants (served at /api/config)
+  src/config.js          getSettings() cache, deliveryFor(), publicConfig() (/api/config)
+  src/settings.js        Shop settings defaults, merge, validation
+  src/shell.js           Writes the shop's theme and config into index.html
+  src/storage.js         Local or S3/R2 storage, WebP renditions
+  src/catalogue-import.js, src/import-catalogue.js   CSV/XLSX catalogue import
+  src/provision.js       One-command shop onboarding
   src/db.js              Mongoose models, connection, admin bootstrap
-  src/seed.js            24-product catalog seed
+  src/seed.js            24-product demo catalogue (opt-in)
   src/auth.js            JWT sign/verify middleware
   src/pricing.js         Order money math (pure, unit-tested)
   src/variants.js        Per-variant stock rules (pure, unit-tested)
@@ -163,12 +193,16 @@ backend/
   src/audit.js           Append-only admin audit log
   src/uploads.js         Upload sniffing
   src/migrate-variants.js  Flat stock → variants (idempotent)
-  src/routes/            auth, products, orders, wishlist, admin
+  src/routes/            auth, products, orders, wishlist, admin, admin-settings, admin-import
   test/                  node:test unit and route tests
+shared/                  Settings defaults + palette→CSS token map (both halves import them)
+shops/                   Provision files and deploy.json (per-shop CI matrix)
+docs/onboarding.md       Per-shop runbook
 frontend/
   src/styles.css         Design system (tokens at the top)
-  src/api.js             API client + price formatting
-  src/store.jsx          Auth + Cart contexts
+  src/api.js             API client
+  src/store.jsx          Config (useMoney, useCopy), Auth, Wishlist, Cart contexts
+  src/theme.js           Runtime palette and fonts
   src/components/        Header, Footer, ProductCard, ProductImage
   src/pages/             Home, Catalog, Product, Cart, Checkout, Auth, Account, Wishlist
 ```

@@ -115,57 +115,69 @@ economics needs a code change and a redeploy today.
 
 ---
 
-## M6 — White-label the shell
+## M6 — White-label the shell ✅
 
 Goal: onboarding a shop is env vars plus a settings form, with zero code edits.
 Ordered so nothing is blocked on anything after it.
 
-- [ ] **Sweep the colour literals into tokens first.** 26 CSS hex literals plus 5
+- [x] **Sweep the colour literals into tokens first.** 26 CSS hex literals plus 5
       JSX files (see audit). Add tokens to `admin/admin.css`, which has none.
       Convert the `Charts.jsx` / `Dashboard.jsx` / `ProductImage.jsx` palettes to
       read `getComputedStyle` custom properties or accept colours as props. Until
       this lands, nothing downstream can retheme anything.
-- [ ] **`Settings` model** — a singleton document in `db.js`: shop name, wordmark
+- [x] **`Settings` model** — a singleton document in `db.js`: shop name, wordmark
       (plain string, dropping the `<em>` markup trick), logo URL, palette (the
       `:root` token set), display/body font families, currency + locale, delivery
       threshold and fee, per-line cap, support email and phone, WhatsApp number,
       topbar copy, hero eyebrow/headline/body/CTA, the three perk blocks, footer
       tagline, and a `departments` array of `{name, colour, icon}` replacing the
       three hardcoded tables.
-- [ ] **Expand `GET /api/config`** to serve it, keeping the current keys so nothing
+- [x] **Expand `GET /api/config`** to serve it, keeping the current keys so nothing
       breaks. Refactor `backend/src/config.js` from exported constants to a cached
       per-request read, so `deliveryFor()` and `MAX_QTY_PER_LINE` resolve from the
       document. **`routes/orders.js:41` and `:64` are the money path** — they must
       read the same source the client is quoted from, or the server charges a total
       the shopper never agreed to.
-- [ ] **Inject the palette at runtime.** `ConfigProvider` (`store.jsx:19`) writes
+- [x] **Inject the palette at runtime.** `ConfigProvider` (`store.jsx:19`) writes
       the token set onto `document.documentElement.style` and loads the two Google
       Fonts by name. Ship the current values as the fallback so first paint isn't
       unstyled.
-- [ ] **`useMoney()` hook** replacing `fmtPrice`, reading locale + currency from
+- [x] **`useMoney()` hook** replacing `fmtPrice`, reading locale + currency from
       config. 12 call sites.
-- [ ] **Departments from data.** `Header.jsx:7` reads `config.departments`;
+- [x] **Departments from data.** `Header.jsx:7` reads `config.departments`;
       `Home.jsx` and `ProductImage.jsx` look up colour and icon by name with a
       sane generic fallback instead of a fashion-specific one.
-- [ ] **Copy from data.** Header topbar, hero, perks, footer, page title,
+- [x] **Copy from data.** Header topbar, hero, perks, footer, page title,
       search placeholder, `Auth.jsx` sign-up prompt. Delete the "MVP demo" string.
-- [ ] **Admin → Settings page.** A new `/admin/settings` route so the shop owner
+- [x] **Admin → Settings page.** A new `/admin/settings` route so the shop owner
       changes their own name, colours, delivery fees and copy without calling you.
       This is what makes the model actually scale — otherwise you're still the
       bottleneck, just with fewer git branches.
-- [ ] **Onboarding script.** `npm run provision` writes a `Settings` document from
+- [x] **Onboarding script.** `npm run provision` writes a `Settings` document from
       a JSON file and creates the owner's admin account, so a new shop is one
       command plus a catalogue import.
-- [ ] **Optional demo seed.** `seed.js` currently hardcodes 24 fashion products
+- [x] **Optional demo seed.** `seed.js` currently hardcodes 24 fashion products
       with Unsplash URLs and KES→UGX conversion. Split into "demo data" (opt-in,
       for showing prospects) and a CSV/XLSX catalogue import a real client can use
       to load their own stock. Note `Dockerfile:35` runs the seed on every boot.
-- [ ] Extend the CI smoke test: `/api/config` serves the settings shape, a changed
+- [x] Extend the CI smoke test: `/api/config` serves the settings shape, a changed
       delivery fee is honoured by `POST /api/orders`, and the provision script is
       idempotent.
 
 **Deliberately not included:** per-shop custom domains and TLS. Railway handles
 that per service; it's ops, not code.
+
+**Done.** Settings live in one `ShopSettings` document (defaults in
+`shared/default-settings.json`, validation in `backend/src/settings.js`),
+cached per request and invalidated on write; `routes/orders.js` prices from the
+same `getSettings()` snapshot `/api/config` serves. The server writes the
+theme, fonts, title and config into `index.html`, so first paint is the shop's
+own. The importer takes CSV or XLSX (one row per size/colour) through
+`npm run import:catalogue` or Admin → Products → Import, and the demo seed only
+runs with `npm run seed` / `SEED_DEMO=1`. Beyond the plan: Settings edits are
+audited, and whole-number prices drop their minor units (KES 200,000, not
+200,000.00). **Not verified:** rendering in a real client's fonts beyond the
+two tried here (Fraunces/Outfit, and the Acme example's palette).
 
 ---
 
@@ -254,28 +266,50 @@ UI: `/forgot-password`, `/reset-password`, `/accept-invite`, `/admin/team` and `
 
 ---
 
-## M10 — Platform operations
+## M10 — Platform operations ✅ (bar the first live runs)
 
-- [ ] **Images off local disk.** `UPLOAD_DIR` (`admin.js:14`) is a Railway volume;
+- [x] **Images off local disk.** `UPLOAD_DIR` (`admin.js:14`) is a Railway volume;
       it doesn't survive service recreation cleanly, has no CDN, and serves
       full-size originals to phones on mobile data. Move to S3/R2/Cloudinary with
       resizing. This matters more than it sounds — product photography is most of
       the page weight in a fashion store, on the slowest connections.
-- [ ] **Per-shop onboarding runbook** (draft below) as a checklist you actually
+- [x] **Per-shop onboarding runbook** (draft below) as a checklist you actually
       follow, so shop #5 doesn't get a subtly different setup.
-- [ ] **Shared CI, per-shop deploy.** `ci-cd.yml:203-219` deploys a single
+- [x] **Shared CI, per-shop deploy.** `ci-cd.yml:203-219` deploys a single
       `RAILWAY_SERVICE_ID`. Make it a matrix over shops, with the option to hold a
       shop back — you want one client on a new release before all of them.
-- [ ] **Uptime monitoring** per shop against the existing `/api/health`
+- [x] **Uptime monitoring** per shop against the existing `/api/health`
       (`server.js:20`), and database backups. Neither exists today.
-- [ ] **Doc drift.** `README.md` describes the stack accurately, but a stale
+- [x] **Doc drift.** `README.md` describes the stack accurately, but a stale
       `backend/bayan.db*` trio is sitting in your working tree (gitignored, so
       never committed — just delete it) and `nixpacks.toml:1` still
       claims Node 22 is pinned "for the built-in node:sqlite driver" — both left
       over from before the Mongo migration. `railway.json:4` uses the Dockerfile
       builder, so `nixpacks.toml` may be dead entirely; confirm and delete.
-- [ ] **Add a `CLAUDE.md`** capturing the architecture and conventions, so future
+- [x] **Add a `CLAUDE.md`** capturing the architecture and conventions, so future
       sessions don't re-derive them.
+
+---
+
+**Done:** `backend/src/storage.js` stores uploads on disk or in any
+S3-compatible bucket (R2, S3, B2), re-encoding photos to 1600/800/400px WebP
+with EXIF stripped; the storefront picks a rendition with `srcset`.
+`npm run migrate:storage` moves an existing volume across. The runbook is
+`docs/onboarding.md`. `shops/deploy.json` drives a deploy matrix: ring 0 is
+the canary, ring 1 follows once it's healthy, and `hold` skips a shop.
+`backup.yml` does a nightly `mongodump` per shop (optionally gpg-encrypted, to
+a bucket or a 14-day artifact); `uptime.yml` checks `/api/health` hourly.
+`nixpacks.toml` was dead (`railway.json` uses the Dockerfile builder) and is
+deleted. `CLAUDE.md` is written.
+
+**Not verified:** none of the three workflows has run for real yet. They pass
+actionlint, but the deploy matrix runs for the first time on the next push to
+`main`, and backups need `BAYAN_MONGODB_URI` (and ideally `BACKUP_PASSPHRASE`)
+added as secrets. Bayan's `url` in `shops/deploy.json` is empty, so its
+post-deploy health check and uptime check are skipped until it is filled in.
+The stale `backend/bayan.db*` files are gitignored on the owner's machine, not
+in the repository, so they can only be deleted there. S3 uploads were tested
+against a fake client, not a real bucket.
 
 ---
 
