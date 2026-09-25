@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useAuth, useCart, useConfig } from "../store";
-import { fmtPrice } from "../api";
+import { useAuth, useCart, useConfig, useCopy } from "../store";
 import { HeartIcon, BagIcon, MenuIcon, CloseIcon, SearchIcon } from "./Icons";
 import Notifications from "../admin/Notifications";
-
-const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
+import Wordmark from "./Wordmark";
+import { useDepartments } from "./departments";
 
 export default function Header() {
+  const t = useCopy();
+  // Nav departments come from the shop's settings, in the owner's order.
+  const departments = useDepartments().map((d) => d.name);
   const { user, logout } = useAuth();
   const { count } = useCart();
-  const { free_delivery_threshold_cents } = useConfig();
+  const { copy } = useConfig();
+  const searchPlaceholder = t(copy.search_placeholder);
   const [q, setQ] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -65,9 +68,7 @@ export default function Header() {
 
   return (
     <>
-      <div className="topbar">
-        Free delivery on orders over {fmtPrice(free_delivery_threshold_cents)} · Cash on delivery available
-      </div>
+      {copy.topbar && <div className="topbar">{t(copy.topbar)}</div>}
       <header className="header">
         <div className="container header-inner">
           <button
@@ -85,12 +86,12 @@ export default function Header() {
           </button>
 
           <Link to="/" className="logo">
-            Ba<em>y</em>an
+            <Wordmark />
           </Link>
 
           <nav className="nav">
-            {CATEGORIES.map((c) => (
-              <NavLink key={c} to={`/shop?category=${c}`}>
+            {departments.map((c) => (
+              <NavLink key={c} to={`/shop?category=${encodeURIComponent(c)}`}>
                 {c}
               </NavLink>
             ))}
@@ -101,7 +102,7 @@ export default function Header() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search Bayan…"
+                placeholder={searchPlaceholder}
                 aria-label="Search products"
               />
             </form>
@@ -159,7 +160,7 @@ export default function Header() {
                 ref={mobileSearchRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search Bayan…"
+                placeholder={searchPlaceholder}
                 aria-label="Search products"
               />
             </form>
@@ -171,8 +172,8 @@ export default function Header() {
         {menuOpen && (
           <div className="mobile-nav" id="mobile-nav">
             <nav className="container">
-              {CATEGORIES.map((c) => (
-                <NavLink key={c} to={`/shop?category=${c}`}>
+              {departments.map((c) => (
+                <NavLink key={c} to={`/shop?category=${encodeURIComponent(c)}`}>
                   {c}
                 </NavLink>
               ))}

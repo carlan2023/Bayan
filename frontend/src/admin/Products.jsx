@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, fmtPrice } from "../api";
+import { api } from "../api";
 import { compressImage } from "../imageCompress";
 import Pager from "./Pager";
 import { cssVar } from "../theme";
+import { useMoney } from "../store";
 
 const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
 
@@ -70,6 +71,7 @@ function toPayload(f) {
 const PAGE_SIZE = 25;
 
 export default function Products() {
+  const money = useMoney();
   const [page, setPage] = useState(1);
   // Server-side search: the old client-side filter could only narrow the 100
   // products the public endpoint would return, so the rest were unreachable.
@@ -435,7 +437,7 @@ export default function Products() {
                     </div>
                   </td>
                   <td>{p.category}</td>
-                  <td className="num">{fmtPrice(p.price_cents)}</td>
+                  <td className="num">{money(p.price_cents)}</td>
                   <td className="num" style={{ color: p.stock <= 10 ? "var(--danger)" : "inherit" }}>{p.stock}</td>
                   <td>{p.featured ? "Yes" : "—"}</td>
                   <td className="num">

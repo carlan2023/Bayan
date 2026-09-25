@@ -99,7 +99,5 @@ export const api = {
   },
 };
 
-export const fmtPrice = (cents) =>
-  new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(
-    cents / 100
-  );
+// Price formatting moved to the useMoney() hook in store.jsx: it reads the
+// shop's currency and locale from config, which a module function cannot.

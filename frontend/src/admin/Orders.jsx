@@ -1,11 +1,13 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { api, fmtPrice } from "../api";
+import { api } from "../api";
 import Pager from "./Pager";
+import { useMoney } from "../store";
 
 const STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
 const PAGE_SIZE = 25;
 
 export default function Orders() {
+  const money = useMoney();
   const [filter, setFilter] = useState("");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -137,7 +139,7 @@ export default function Orders() {
                       {o.note && <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>“{o.note}”</div>}
                     </td>
                     <td>{new Date(o.created_at).toLocaleString()}</td>
-                    <td className="num">{fmtPrice(o.total_cents)}</td>
+                    <td className="num">{money(o.total_cents)}</td>
                     <td>
                       <select
                         className="select-sm"
@@ -168,13 +170,13 @@ export default function Orders() {
                                 <td>{i.name}</td>
                                 <td>{[i.size, i.color].filter(Boolean).join(" · ") || "—"}</td>
                                 <td className="num">{i.qty}</td>
-                                <td className="num">{fmtPrice(i.price_cents)}</td>
-                                <td className="num">{fmtPrice(i.price_cents * i.qty)}</td>
+                                <td className="num">{money(i.price_cents)}</td>
+                                <td className="num">{money(i.price_cents * i.qty)}</td>
                               </tr>
                             ))}
                             <tr>
                               <td colSpan="4" className="num">Delivery</td>
-                              <td className="num">{o.delivery_cents === 0 ? "Free" : fmtPrice(o.delivery_cents)}</td>
+                              <td className="num">{o.delivery_cents === 0 ? "Free" : money(o.delivery_cents)}</td>
                             </tr>
                           </tbody>
                         </table>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useCart, useConfig, useWishlist } from "../store";
+import { api } from "../api";
+import { useCart, useConfig, useMoney, useWishlist } from "../store";
 import { useAsync } from "../useAsync";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
@@ -10,6 +10,7 @@ import { HeartIcon, CheckIcon, WhatsAppIcon } from "../components/Icons";
 import { waProductLink } from "../whatsapp";
 
 export default function Product() {
+  const money = useMoney();
   const { slug } = useParams();
   const { add } = useCart();
   const { has, toggle } = useWishlist();
@@ -91,8 +92,8 @@ export default function Product() {
           <div className="cat">{product.category}</div>
           <h1>{product.name}</h1>
           <div className="price">
-            {fmtPrice(product.price_cents)}
-            {product.compare_at_cents && <span className="was">{fmtPrice(product.compare_at_cents)}</span>}
+            {money(product.price_cents)}
+            {product.compare_at_cents && <span className="was">{money(product.compare_at_cents)}</span>}
           </div>
           {lowStock && (
             <div className="stock-alert" role="status">
@@ -166,7 +167,7 @@ export default function Product() {
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
           <div className="meta-line">
             {soldOut ? "Out of stock" : product.stock > 10 ? "In stock" : `Only ${product.stock} left`} ·
-            Cash on delivery available · Free delivery over {fmtPrice(free_delivery_threshold_cents)}
+            Cash on delivery available · Free delivery over {money(free_delivery_threshold_cents)}
           </div>
         </div>
       </div>

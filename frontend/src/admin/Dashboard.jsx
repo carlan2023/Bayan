@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, fmtPrice } from "../api";
+import { api } from "../api";
 import { BarChart, Donut } from "./Charts";
+import { useMoney } from "../store";
 
 // Resolved by CSS (admin.css --status-*), so the donut follows the shop's palette.
 const statusColor = (status) => `var(--status-${status}, var(--chart-5))`;
 
 export default function Dashboard() {
+  const money = useMoney();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
 
@@ -37,7 +39,7 @@ export default function Dashboard() {
       <div className="kpis">
         <div className="kpi accent">
           <div className="kpi-label">Revenue</div>
-          <div className="kpi-value">{fmtPrice(totals.revenue_cents)}</div>
+          <div className="kpi-value">{money(totals.revenue_cents)}</div>
           <div className="kpi-sub">excl. cancelled orders</div>
         </div>
         <div className="kpi">
@@ -47,7 +49,7 @@ export default function Dashboard() {
         </div>
         <div className="kpi">
           <div className="kpi-label">Avg. order value</div>
-          <div className="kpi-value">{fmtPrice(totals.aov_cents)}</div>
+          <div className="kpi-value">{money(totals.aov_cents)}</div>
           <div className="kpi-sub">{totals.units_sold} units sold</div>
         </div>
         <div className="kpi">
@@ -60,7 +62,7 @@ export default function Dashboard() {
       <div className="admin-grid">
         <div className="admin-panel">
           <h3>Revenue <span>— last 14 days</span></h3>
-          <BarChart data={bars} formatValue={fmtPrice} />
+          <BarChart data={bars} formatValue={money} />
         </div>
         <div className="admin-panel">
           <h3>Orders by status</h3>
@@ -90,7 +92,7 @@ export default function Dashboard() {
                     <tr key={p.product_id}>
                       <td>{p.name}</td>
                       <td className="num">{p.units}</td>
-                      <td className="num">{fmtPrice(p.revenue_cents)}</td>
+                      <td className="num">{money(p.revenue_cents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -105,7 +107,7 @@ export default function Dashboard() {
           ) : (
             <Donut
               segments={revenue_by_category.map((c) => ({ label: c.category, value: c.revenue_cents }))}
-              formatValue={fmtPrice}
+              formatValue={money}
             />
           )}
         </div>
@@ -129,7 +131,7 @@ export default function Dashboard() {
                       <td>{o.customer_name}</td>
                       <td>{o.city}</td>
                       <td><span className={`chip ${o.status}`}>{o.status}</span></td>
-                      <td className="num">{fmtPrice(o.total_cents)}</td>
+                      <td className="num">{money(o.total_cents)}</td>
                     </tr>
                   ))}
                 </tbody>

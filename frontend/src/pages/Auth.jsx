@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../store";
+import { useAuth, useConfig, useCopy } from "../store";
 
 export default function Auth() {
   const { login, register } = useAuth();
+  const { copy } = useConfig();
+  const t = useCopy();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState("login");
@@ -71,7 +73,7 @@ export default function Auth() {
         <div className="auth-switch">
           {mode === "login" ? (
             <>
-              New to Bayan?{" "}
+              {t(copy.signup_prompt)}{" "}
               <button type="button" className="link-btn" onClick={() => setMode("register")}>
                 Create an account
               </button>

@@ -1,10 +1,11 @@
 import { Link, Navigate } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useAuth } from "../store";
+import { api } from "../api";
+import { useAuth, useMoney } from "../store";
 import { useAsync } from "../useAsync";
 import ErrorState from "../components/ErrorState";
 
 export default function Account() {
+  const money = useMoney();
   const { user } = useAuth();
   // Previously a failed fetch was swallowed into an empty array, so a network
   // error was indistinguishable from genuinely having no orders.
@@ -60,12 +61,12 @@ export default function Account() {
                     </span>
                   )}
                 </span>
-                <span>{fmtPrice(i.price_cents * i.qty)}</span>
+                <span>{money(i.price_cents * i.qty)}</span>
               </div>
             ))}
             <div className="summary-line total">
               <span>Total (cash on delivery)</span>
-              <span>{fmtPrice(o.total_cents)}</span>
+              <span>{money(o.total_cents)}</span>
             </div>
           </div>
         ))

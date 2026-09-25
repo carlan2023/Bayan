@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useConfig } from "../store";
+import { api } from "../api";
+import { useConfig, useMoney } from "../store";
 import { useAsync } from "../useAsync";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
@@ -14,6 +14,7 @@ const CAT_COLORS = {
 };
 
 export default function Home() {
+  const money = useMoney();
   const { free_delivery_threshold_cents, delivery_fee_cents } = useConfig();
 
   // One fetch for both strips: if either fails the page says so instead of
@@ -133,9 +134,9 @@ export default function Home() {
             </p>
           </div>
           <div className="perk">
-            <h3>Free delivery over {fmtPrice(free_delivery_threshold_cents)}</h3>
+            <h3>Free delivery over {money(free_delivery_threshold_cents)}</h3>
             <p>
-              Flat {fmtPrice(delivery_fee_cents)} delivery on smaller orders, anywhere in the
+              Flat {money(delivery_fee_cents)} delivery on smaller orders, anywhere in the
               country.
             </p>
           </div>

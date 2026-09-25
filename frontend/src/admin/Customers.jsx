@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, fmtPrice } from "../api";
+import { api } from "../api";
+import { useMoney } from "../store";
 
 export default function Customers() {
+  const money = useMoney();
   const [customers, setCustomers] = useState(null);
   const [error, setError] = useState("");
 
@@ -42,7 +44,7 @@ export default function Customers() {
                   <td>{c.email}</td>
                   <td>{new Date(c.created_at).toLocaleDateString()}</td>
                   <td className="num">{c.orders}</td>
-                  <td className="num">{fmtPrice(c.spent_cents)}</td>
+                  <td className="num">{money(c.spent_cents)}</td>
                 </tr>
               ))}
             </tbody>
