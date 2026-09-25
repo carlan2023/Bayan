@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useConfig, useMoney } from "../store";
 import Pager from "./Pager";
 import ProductForm, { emptyForm, toForm } from "./ProductForm";
+import ImportPanel from "./ImportPanel";
 
 const PAGE_SIZE = 25;
 
@@ -22,6 +23,7 @@ export default function Products() {
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(
     () =>
@@ -90,9 +92,13 @@ export default function Products() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          <button className="btn btn-ghost btn-sm" onClick={() => setImporting((v) => !v)} aria-expanded={importing}>
+            Import
+          </button>
           <button
             className="btn btn-accent btn-sm"
             onClick={() => {
+              setImporting(false);
               setForm(emptyForm(departments));
               setEditingId(null);
               setError("");
@@ -105,6 +111,16 @@ export default function Products() {
 
       {notice && <div className="alert alert-ok">{notice}</div>}
       {error && <div className="alert alert-error">{error}</div>}
+
+      {importing && (
+        <ImportPanel
+          onClose={() => setImporting(false)}
+          onDone={(message) => {
+            setNotice(message);
+            load();
+          }}
+        />
+      )}
 
       {form && (
         <ProductForm

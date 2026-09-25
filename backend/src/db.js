@@ -332,7 +332,7 @@ export async function connectDB({ bootstrapAdmin = true } = {}) {
       console.log(`Promoted existing user ${email} to admin.`);
     } else {
       await User.create({
-        name: "Bayan Admin",
+        name: "Shop Admin",
         email,
         password_hash: await bcrypt.hash(password, 10),
         is_admin: true,

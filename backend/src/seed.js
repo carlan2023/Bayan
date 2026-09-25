@@ -161,7 +161,21 @@ function seedVariants(slug, p) {
   return { variants, stock: totalStock(variants) };
 }
 
+/**
+ * The 24-product fashion catalogue is demo data, for showing prospects and for
+ * development — never something a real shop should boot into. It only runs
+ * when asked: `npm run seed` (which passes --demo) or SEED_DEMO=1. The
+ * Dockerfile calls this on every boot, so a new shop's deployment stays empty
+ * until its own catalogue is imported (npm run import:catalogue, or Admin →
+ * Products → Import).
+ */
+const DEMO = process.argv.includes("--demo") || process.env.SEED_DEMO === "1";
+
 async function main() {
+  if (!DEMO) {
+    console.log("Demo catalogue not requested (run `npm run seed` or set SEED_DEMO=1) - skipping seed.");
+    return;
+  }
   await connectDB();
   const count = await Product.countDocuments();
 
@@ -185,4 +199,4 @@ main()
     console.error(err);
     process.exitCode = 1;
   })
-  .finally(() => disconnectDB());
+  .finally(() => (DEMO ? disconnectDB() : undefined));

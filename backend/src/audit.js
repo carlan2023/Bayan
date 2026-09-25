@@ -19,6 +19,8 @@ export const AUDIT_ACTIONS = [
   "admin.join",
   "admin.demote",
   "auth.password_reset",
+  "settings.update",
+  "catalogue.import",
 ];
 
 const auditSchema = new mongoose.Schema(

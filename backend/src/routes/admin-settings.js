@@ -3,6 +3,7 @@ import { ShopSettings, SETTINGS_ID } from "../db.js";
 import { requireAdmin } from "./admin.js";
 import { getSettings, invalidateSettings, publicConfig } from "../config.js";
 import { applySettingsPatch, DEPARTMENT_ICONS, PALETTE_KEYS } from "../settings.js";
+import { audit } from "../audit.js";
 
 /**
  * Admin → Settings. The shop owner edits their own name, colours, fonts,
@@ -40,6 +41,18 @@ router.put("/", async (req, res, next) => {
 
     await ShopSettings.replaceOne({ _id: SETTINGS_ID }, { _id: SETTINGS_ID, ...settings }, { upsert: true });
     invalidateSettings();
+    // Delivery pricing and the cap change what customers are charged, so
+    // every edit is on the record, with the fields that changed.
+    const changed = Object.keys(settings).filter((k) => JSON.stringify(settings[k]) !== JSON.stringify(current[k]));
+    if (changed.length) {
+      await audit(req.user, "settings.update", {
+        target_type: "settings",
+        target_id: SETTINGS_ID,
+        summary: `Changed shop settings: ${changed.join(", ")}`,
+        before: Object.fromEntries(changed.map((k) => [k, current[k]])),
+        after: Object.fromEntries(changed.map((k) => [k, settings[k]])),
+      });
+    }
     const fresh = await getSettings();
     res.json({ settings: fresh, config: publicConfig(fresh) });
   } catch (err) {

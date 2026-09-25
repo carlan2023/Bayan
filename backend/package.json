@@ -10,11 +10,14 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed": "node src/seed.js",
+    "seed": "node src/seed.js --demo",
     "migrate:remove-imageless": "node src/migrate-remove-imageless.js",
     "migrate:variants": "node src/migrate-variants.js",
     "test": "node --test \"test/*.test.js\"",
-    "test:unit": "node --test test/config.test.js test/pricing.test.js test/uploads.test.js test/variants.test.js"
+    "test:unit": "node --test test/catalogue-import.test.js test/config.test.js test/config-stale.test.js test/pricing.test.js test/settings.test.js test/shell.test.js test/storage.test.js test/uploads.test.js test/variants.test.js",
+    "migrate:storage": "node src/migrate-storage.js",
+    "provision": "node src/provision.js",
+    "import:catalogue": "node src/import-catalogue.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1139.0",

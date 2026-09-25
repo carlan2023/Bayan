@@ -81,15 +81,24 @@ export function useDelivery(subtotalCents) {
   return subtotalCents >= free_delivery_threshold_cents ? 0 : delivery_fee_cents;
 }
 
-/** A money formatter for a currency + locale (prices are stored as cents). */
+/**
+ * A money formatter for a currency + locale (prices are stored as cents).
+ * Whole amounts drop the minor units, so KES 200,000 isn't "Ksh 200,000.00",
+ * while a price with cents keeps them.
+ */
 export function moneyFormatter(currency, locale) {
-  let nf;
+  let whole;
+  let exact;
   try {
-    nf = new Intl.NumberFormat(locale, { style: "currency", currency });
+    whole = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0, minimumFractionDigits: 0 });
+    exact = new Intl.NumberFormat(locale, { style: "currency", currency });
   } catch {
-    nf = new Intl.NumberFormat(undefined, { style: "currency", currency: "UGX" });
+    whole = exact = new Intl.NumberFormat(undefined, { style: "currency", currency: "UGX", maximumFractionDigits: 0 });
   }
-  return (cents) => nf.format((cents || 0) / 100);
+  return (cents) => {
+    const c = cents || 0;
+    return (c % 100 === 0 ? whole : exact).format(c / 100);
+  };
 }
 
 /**

@@ -1,0 +1,41 @@
+{
+  "settings": {
+    "shop_name": "Acme Wear",
+    "wordmark": "Acme",
+    "page_title": "Acme Wear — Everyday clothing, delivered",
+    "palette": {
+      "primary": "#5b2333",
+      "primary_dark": "#3f1823",
+      "primary_tint": "#f1e3e6",
+      "accent": "#c47c2b",
+      "accent_dark": "#9e6120"
+    },
+    "fonts": { "display": "Playfair Display", "body": "Inter" },
+    "currency": "KES",
+    "locale": "en-KE",
+    "free_delivery_threshold_cents": 500000,
+    "delivery_fee_cents": 30000,
+    "support_email": "hello@acme.example",
+    "support_phone": "+254 700 000 000",
+    "whatsapp_number": "254700000000",
+    "copy": {
+      "topbar": "Free delivery in Nairobi over {free_delivery_threshold}",
+      "hero": {
+        "eyebrow": "New in",
+        "headline": "Everyday clothing.",
+        "headline_emphasis": "Delivered to your door.",
+        "body": "Well-made basics in honest fabrics, delivered across Kenya.",
+        "cta": "Shop now"
+      },
+      "footer_tagline": "Everyday clothing, made to last.",
+      "footer_promises": ["Pay on delivery", "Free returns within 7 days"]
+    },
+    "departments": [
+      { "name": "Women", "colour": "#5b2333", "icon": "dress" },
+      { "name": "Men", "colour": "#2b3a4a", "icon": "shirt" },
+      { "name": "Shoes", "colour": "#c47c2b", "icon": "shoe" }
+    ]
+  },
+  "owner": { "email": "owner@acme.example", "name": "Acme Owner" },
+  "catalogue": "example-catalogue.csv"
+}

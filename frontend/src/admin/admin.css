@@ -261,3 +261,7 @@
 .variant-table tr.variant-out td:first-child,
 .variant-table tr.variant-out td:nth-child(2) { color: var(--danger); }
 .invite-link { word-break: break-all; font-size: 0.82rem; }
+.import-errors { margin: 8px 0 0 18px; font-size: 0.85rem; max-height: 240px; overflow: auto; }
+.import-preview { max-height: 320px; overflow: auto; margin-bottom: 12px; }
+.settings-page input[type="color"] { width: 44px; height: 34px; padding: 2px; flex: none; cursor: pointer; }
+.settings-page .palette-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); }
