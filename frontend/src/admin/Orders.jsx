@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import Pager from "./Pager";
 import { useMoney } from "../store";
+import { PAYMENT_LABELS, NETWORK_LABELS } from "../payment";
 
 const STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
 const PAGE_SIZE = 25;
@@ -48,6 +49,17 @@ export default function Orders() {
     setError("");
     try {
       await api.admin.setOrderStatus(order.id, status);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function setPayment(order, payment_status, confirmText) {
+    if (!window.confirm(confirmText)) return;
+    setError("");
+    try {
+      await api.admin.setPaymentStatus(order.id, payment_status);
       load();
     } catch (e) {
       setError(e.message);
@@ -117,6 +129,7 @@ export default function Orders() {
                 <th>Delivery</th>
                 <th>Placed</th>
                 <th className="num">Total</th>
+                <th>Payment</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -141,6 +154,30 @@ export default function Orders() {
                     <td>{new Date(o.created_at).toLocaleString()}</td>
                     <td className="num">{money(o.total_cents)}</td>
                     <td>
+                      <span className={`pay-badge pay-${o.payment_status}`}>{PAYMENT_LABELS[o.payment_status] || o.payment_status}</span>
+                      {o.payment_method === "mobile_money" && (
+                        <div className="muted-sku">{NETWORK_LABELS[o.payment?.network] || "Mobile money"}</div>
+                      )}
+                      {o.payment_status === "review" && (
+                        <div className="tools">
+                          <button className="link-btn" onClick={() => setPayment(o, "paid", `Accept the payment for #${o.number} as paid in full?`)}>
+                            Accept
+                          </button>
+                          <button className="link-btn" onClick={() => setPayment(o, "refund_due", `Mark #${o.number} as needing a refund?`)}>
+                            Refund
+                          </button>
+                        </div>
+                      )}
+                      {o.payment_status === "refund_due" && (
+                        <button
+                          className="link-btn"
+                          onClick={() => setPayment(o, "refunded", `Have you refunded #${o.number} in Flutterwave?`)}
+                        >
+                          Mark refunded
+                        </button>
+                      )}
+                    </td>
+                    <td>
                       <select
                         className="select-sm"
                         value={o.status}
@@ -159,7 +196,7 @@ export default function Orders() {
                   </tr>
                   {open === o.id && (
                     <tr>
-                      <td colSpan="8" style={{ background: "var(--bg)" }}>
+                      <td colSpan="9" style={{ background: "var(--bg)" }}>
                         <table className="admin-table" style={{ margin: "4px 0" }}>
                           <thead>
                             <tr><th>Item</th><th>Options</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Line total</th></tr>

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useConfig, useCopy } from "../store";
 import Wordmark from "./Wordmark";
 
@@ -18,6 +19,9 @@ export default function Footer() {
           {(copy.footer_promises || []).map((line) => (
             <div key={line}>{t(line)}</div>
           ))}
+          <div>
+            <Link to="/track">Track an order</Link>
+          </div>
           {support_email && (
             <div>
               <a href={`mailto:${support_email}`}>{support_email}</a>

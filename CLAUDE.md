@@ -28,6 +28,8 @@ backend/src/
   uploads.js           magic-number sniffing
   catalogue-import.js  CSV/XLSX → products (pure); import-catalogue.js writes
   provision.js         one-command shop onboarding
+  payments.js          payment state machine (pure); payment-service.js applies it
+  flutterwave.js       MoMo/Airtel via Flutterwave; whatsapp.js Cloud API; order-notifications.js
   mailer.js            Resend or console; auth-tokens.js; audit.js
   routes/              auth, products, orders, wishlist, admin, admin-settings, admin-import
 backend/test/          node:test: *.test.js unit, *.routes.test.js against real Mongo
@@ -52,6 +54,11 @@ shops/                 provision files and deploy.json (the per-shop CI matrix)
   `variantFilter` + `variantInc` (guarded `$inc`, no transactions, works on
   standalone Mongo); give back only through `restoreStock()`. Any new exit path
   in order creation must release what it reserved.
+- **Payments** move only through `transition()` in `payment-service.js`
+  (the rules are in `payments.js`, pure and tested). Never trust a webhook
+  body: re-verify with the provider. Never restock an order directly; call
+  `releaseOrderStock()`, which claims `stock_released` so it happens once.
+  Unpaid mobile money orders can't be fulfilled.
 - **Never read shop config at import time.** Use `getSettings()` per request.
   No module-level currency, fees or brand strings in either half.
 - **No colour literals below the `:root` token blocks** in `styles.css` /

@@ -21,6 +21,8 @@ import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
+import OrderPayment from "./pages/OrderPayment";
+import TrackOrder from "./pages/TrackOrder";
 import AdminTeam from "./admin/Team";
 import AdminAudit from "./admin/Audit";
 
@@ -58,6 +60,8 @@ export default function App() {
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/accept-invite" element={<AcceptInvite />} />
+                  <Route path="/order/:id/payment" element={<OrderPayment />} />
+                  <Route path="/track" element={<TrackOrder />} />
                   {/* Catch-all inside the shop layout, so a bad URL still gets
                       a header, footer and a way back. */}
                   <Route path="*" element={<NotFound />} />

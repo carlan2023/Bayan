@@ -1,6 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useMoney } from "../store";
+import { PAYMENT_LABELS } from "../payment";
 import { useAsync } from "../useAsync";
 import ErrorState from "../components/ErrorState";
 
@@ -47,7 +48,16 @@ export default function Account() {
                   {new Date(o.created_at).toLocaleDateString()}
                 </span>
               </div>
-              <span className="status-chip">{o.status}</span>
+              <span>
+                <span className="status-chip">{o.status}</span>{" "}
+                {o.payment_status === "pending" ? (
+                  <Link className="pay-sub" to={`/order/${o.id}/payment`} style={{ display: "inline" }}>
+                    {PAYMENT_LABELS.pending}
+                  </Link>
+                ) : (
+                  <span className="pay-sub" style={{ display: "inline" }}>{PAYMENT_LABELS[o.payment_status] || ""}</span>
+                )}
+              </span>
             </div>
             {o.items.map((i) => (
               <div className="summary-line" key={i.id}>

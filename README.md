@@ -39,7 +39,8 @@ Open http://localhost:5173. The Vite dev server proxies `/api` to the backend.
 - Catalog with category filter pills, sorting, and keyword search
 - Product pages with colour + size selection, **stock per size/colour variant** (sold-out pairs are disabled, "only 2 left in S / Forest"), optional per-variant price, related items
 - Cart (persists in localStorage) with quantity controls and delivery calculation
-- **Real checkout with Cash on Delivery** — guest or signed-in; server re-prices every line from the DB and reserves stock with guarded conditional updates (safe on standalone MongoDB, no replica set required)
+- **Checkout with cash on delivery or mobile money** (MTN MoMo / Airtel Money through Flutterwave, offered only when keys are set): guest or signed-in; server re-prices every line from the DB and reserves stock with guarded conditional updates (safe on standalone MongoDB, no replica set required)
+- **Order confirmations** by email and WhatsApp to the shopper, and a new-order alert to the shop; **guest order tracking** at `/track` with the order number and phone
 - Accounts: register/login (JWT), order history, wishlist, **password reset by email** (Resend; offered only when email is configured)
 - Currency, delivery fee, free-delivery threshold and per-line cap come from the shop's settings (Bayan: UGX, free over UGX 200,000, otherwise UGX 10,000). They are served at `GET /api/config`, and `POST /api/orders` charges from the same cached read, so the cart never quotes a total the server won't honour
 - Runtime theming: the server writes the shop's title, palette, fonts and config into `index.html` so the first paint is already theirs, and a Settings save rethemes open pages immediately
@@ -70,7 +71,10 @@ POST   /api/auth/forgot            (emails a single-use reset link; same answer 
 POST   /api/auth/reset             ({ token, password } → signs in; revokes older sessions)
 GET    /api/auth/invite?token=     (who an admin invite is for)
 POST   /api/auth/accept-invite     ({ token, name?, password })
-POST   /api/orders                 (guest or auth, COD)
+POST   /api/orders                 (guest or auth; payment_method cod | mobile_money + momo_network, momo_phone)
+GET    /api/orders/lookup?number=&phone=   (guest order lookup, rate-limited)
+GET    /api/orders/:id/payment?token=      (payment status for the browser that placed the order; re-checks the provider)
+POST   /api/payments/flutterwave/webhook   (verif-hash checked; outcome re-verified with Flutterwave)
 GET    /api/orders                 (auth — own history)
 GET    /api/wishlist               (auth)
 POST   /api/wishlist/:productId    (auth)
@@ -79,7 +83,8 @@ DELETE /api/wishlist/:productId    (auth)
 GET    /api/admin/stats                              (admin)
 GET    /api/admin/products?page=&limit=&search=      (admin, paged)
 GET    /api/admin/orders?status=&page=&limit=&search= (admin, paged)
-PATCH  /api/admin/orders/:id                         (admin)
+PATCH  /api/admin/orders/:id                         (admin; unpaid mobile money can't be fulfilled)
+PATCH  /api/admin/orders/:id/payment                 (admin: resolve review → paid/failed/refund_due, refund_due → refunded)
 POST   /api/admin/products                           (admin)
 PUT    /api/admin/products/:id                       (admin)
 DELETE /api/admin/products/:id                       (admin)
@@ -136,6 +141,23 @@ Stock lives on `product.variants: [{ size, color, sku, stock, price_cents? }]`, 
 | `SEED_DEMO` | optional | `1` loads the demo catalogue into an empty database on boot. Unset for real shops |
 | `PROVISION_OWNER_PASSWORD` | provisioning | Initial password for the owner created by `npm run provision` (otherwise generated and printed once) |
 | `SETTINGS_CACHE_MS` | optional | How long settings are cached per process (default 30000) |
+| `FLW_SECRET_KEY`, `FLW_SECRET_HASH` | for mobile money | Flutterwave secret key and webhook secret hash. Without the key, checkout offers cash on delivery only |
+| `FLW_API_BASE` | optional | Override the Flutterwave API base (testing) |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | for WhatsApp | Cloud API credentials; without them no WhatsApp messages are sent |
+| `WHATSAPP_TEMPLATE_ORDER`, `WHATSAPP_TEMPLATE_SHOP`, `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_API_VERSION` | optional | Template names (default `order_confirmation`, `new_order_alert`), language (`en`), Graph version (`v21.0`) |
+
+## Payments
+
+Every order has a fulfilment `status` and a separate `payment_status`, moved only by the state machine in `backend/src/payments.js`:
+
+- **Cash on delivery:** `on_delivery` → `paid` when the order is marked delivered.
+- **Mobile money:** stock is reserved when the order is created and the charge starts (`pending`, 30 minutes). A verified full payment makes it `paid` (and the order `confirmed`); a failure or timeout makes it `failed`/`expired`, cancels the order and releases the stock exactly once. A short or wrong-currency payment goes to `review`; money arriving after a cancel or expiry becomes `refund_due`. Admins resolve those by hand on the Orders page.
+
+The webhook is only a hint: its body names a transaction, and the outcome is always re-read from Flutterwave's verify endpoint and applied with a conditional write, so duplicates and replays change nothing. The shopper's payment page polls the same verification, and a sweep expires unpaid prompts every minute.
+
+Setup (per shop): set `FLW_SECRET_KEY` and `FLW_SECRET_HASH`, and in the Flutterwave dashboard point the webhook at `https://<shop>/api/payments/flutterwave/webhook` with the same secret hash. Mobile money is offered for UGX shops. **Before going live, place one test-mode order per network**: this was built against Flutterwave's v3 API from memory, because its docs were unreachable from the environment that wrote it (see `backend/src/flutterwave.js`).
+
+Notifications go out when an order becomes real: at creation for cash on delivery, and on confirmed payment for mobile money. Email uses the Resend setup above. WhatsApp uses the Cloud API and needs two approved templates (`order_confirmation`, `new_order_alert`; parameters are listed in `backend/src/whatsapp.js`). Each side is sent once per order however many times a webhook fires.
 
 ## Shop operations
 

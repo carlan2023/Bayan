@@ -884,3 +884,34 @@ select.pill { appearance: none; padding-right: 28px; }
   white-space: nowrap;
   border: 0;
 }
+
+/* ---- Payment choice, payment status, order tracking ---- */
+.pay-methods { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.pay-methods legend { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+.pay-option { display: flex; gap: 12px; align-items: flex-start; border: 1.5px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; cursor: pointer; background: var(--surface); text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--ink); }
+.pay-option.active { border-color: var(--pine); background: var(--pine-tint); }
+.pay-option input { margin-top: 4px; width: auto; }
+.pay-option strong { display: block; }
+.pay-sub { display: block; font-size: 0.85rem; color: var(--ink-soft); }
+.pay-momo { display: grid; gap: 6px; padding: 4px 2px 0; }
+.pay-momo .opt { cursor: pointer; }
+.pay-momo .opt:focus-within { outline: 2px solid var(--pine); outline-offset: 2px; }
+.pay-status p { max-width: 520px; margin: 0 auto 16px; }
+.pay-spinner { width: 44px; height: 44px; margin: 0 auto 18px; border-radius: 50%; border: 4px solid var(--pine-tint); border-top-color: var(--pine); animation: pay-spin 0.9s linear infinite; }
+@keyframes pay-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pay-spinner { animation-duration: 3s; } }
+.track-wrap { max-width: 720px; padding-bottom: 48px; }
+.track-form { margin-bottom: 20px; }
+.track-result h2 { font-size: 1.4rem; }
+.track-steps { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 18px 0; padding: 0; counter-reset: step; }
+.track-steps li { position: relative; padding-top: 30px; text-align: center; font-size: 0.85rem; color: var(--ink-soft); }
+.track-steps li::before { counter-increment: step; content: counter(step); position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: var(--line); color: var(--ink); font-size: 0.75rem; }
+.track-steps li.done { color: var(--ink); font-weight: 500; }
+.track-steps li.done::before { background: var(--pine); color: var(--on-primary); content: "✓"; }
+.track-items { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.track-items td { padding: 8px 0; border-top: 1px solid var(--line); }
+.track-items .num { text-align: right; }
+.track-items .total td { font-weight: 600; }
+/* Beat `.form-grid label` (uppercase field labels): these labels are cards. */
+.form-grid .pay-option { display: flex; text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--ink); margin: 0; }
+.form-grid .pay-momo .opt { text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); margin: 0; }

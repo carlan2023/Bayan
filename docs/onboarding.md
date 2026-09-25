@@ -29,6 +29,8 @@ Most of the elapsed time is waiting on the client's logo, colours and stock shee
    | `APP_URL` | the shop's public URL, e.g. `https://shop.example.com` (used in reset and invite emails) |
    | `RESEND_API_KEY`, `EMAIL_FROM` | optional; turns on password reset and emailed invites. `EMAIL_FROM` must be on a domain verified in Resend |
    | `S3_BUCKET`, `S3_PUBLIC_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PREFIX` | image storage (step 2). Without them, uploads go to a volume |
+   | `FLW_SECRET_KEY`, `FLW_SECRET_HASH` | optional; turns on MTN MoMo / Airtel Money at checkout (UGX shops). The shop needs its own Flutterwave account, since payouts go to it |
+   | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | optional; WhatsApp order confirmations and new-order alerts (see step 4a) |
    | `SEED_DEMO` | leave unset. `1` loads the 24-product demo catalogue into an empty database, for showing prospects only |
 
    Do **not** set `ADMIN_EMAIL`/`ADMIN_PASSWORD` for a client shop: provisioning creates the owner instead.
@@ -61,6 +63,11 @@ Leave `PROVISION_OWNER_PASSWORD` out to have one generated and printed once. It 
 2. **Admin → Products**: spot-check the import and add photos per colour where the sheet had none.
 3. **Admin → Team**: invite anyone else who runs the shop.
 4. **Admin → Storefront**: the home-page hero image or video.
+
+## 4a. Payments and WhatsApp (optional)
+
+- **Mobile money:** in the shop's Flutterwave dashboard, set the webhook URL to `https://<shop>/api/payments/flutterwave/webhook` and a secret hash; copy the hash into `FLW_SECRET_HASH` and the secret key into `FLW_SECRET_KEY`. With test keys, place one order per network (MTN, Airtel) and check it reaches **Paid** on the Orders page, then one you abandon, and check it expires within ~30 minutes and its stock comes back. Then switch to live keys.
+- **WhatsApp:** in Meta Business Manager, add the shop's number to a WhatsApp Business account, create a system-user token, and get two templates approved: `order_confirmation` (body parameters: name, order number, total, payment line) and `new_order_alert` (order number, total, customer and town, payment line). Set `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`. Alerts go to the WhatsApp number in Settings.
 
 ## 5. CI, backups, uptime
 

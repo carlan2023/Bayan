@@ -53,6 +53,8 @@ export const api = {
   // orders
   createOrder: (body) => request("/orders", { method: "POST", body }),
   myOrders: () => request("/orders"),
+  orderPayment: (id, token) => request(`/orders/${id}/payment${qs({ token })}`),
+  lookupOrder: (number, phone) => request(`/orders/lookup${qs({ number, phone })}`),
 
   // wishlist
   wishlist: () => request("/wishlist"),
@@ -66,6 +68,8 @@ export const api = {
     orders: (params = {}) => request(`/admin/orders${qs(params)}`),
     products: (params = {}) => request(`/admin/products${qs(params)}`),
     setOrderStatus: (id, status) => request(`/admin/orders/${id}`, { method: "PATCH", body: { status } }),
+    setPaymentStatus: (id, payment_status) =>
+      request(`/admin/orders/${id}/payment`, { method: "PATCH", body: { payment_status } }),
     createProduct: (body) => request("/admin/products", { method: "POST", body }),
     updateProduct: (id, body) => request(`/admin/products/${id}`, { method: "PUT", body }),
     deleteProduct: (id) => request(`/admin/products/${id}`, { method: "DELETE" }),

@@ -208,26 +208,49 @@ The admin form is now `admin/Products.jsx` (list), `admin/ProductForm.jsx` and `
 
 ---
 
-## M8 — Payments and notifications
+## M8 — Payments and notifications ✅ (bar live-provider verification)
 
 COD-only is a hard ceiling on what you can sell, and the first request from every
 client.
 
-- [ ] **Mobile Money** — MTN MoMo and Airtel Money, most simply through an
+- [x] **Mobile Money** — MTN MoMo and Airtel Money, most simply through an
       aggregator (Flutterwave covers both plus cards in the region). Needs a real
       payment state machine: `payment_status` alongside the existing `status`
       (`db.js:78`), an idempotent webhook receiver, and stock reserved on
       *initiation* but only committed on confirmation. Do not bolt this onto the
       current create-order path — the reservation semantics are different.
-- [ ] **WhatsApp order confirmation** to the shopper and a new-order alert to the
+- [x] **WhatsApp order confirmation** to the shopper and a new-order alert to the
       shop. Higher engagement than email in this market, and the number is already
       collected at checkout.
-- [ ] **Order confirmation email** where an address exists (`db.js:73`).
-- [ ] **Guest order lookup.** Guests can order (`routes/orders.js:16`, `optionalAuth`)
+- [x] **Order confirmation email** where an address exists (`db.js:73`).
+- [x] **Guest order lookup.** Guests can order (`routes/orders.js:16`, `optionalAuth`)
       but there is no way for them to see the order afterwards — `GET /api/orders`
       requires auth. Order number + phone is enough.
 - [ ] Verify against current provider docs before estimating — fees, settlement
       times and sandbox availability all move.
+
+**Done:** `payment_status` beside `status` with the transitions in
+`backend/src/payments.js`; stock reserved at initiation, committed on
+verified payment, released once on failure or expiry (`stock_released`
+claim shared with admin cancel); an idempotent webhook that re-verifies every
+outcome with Flutterwave; a status page that polls (and so settles late
+webhooks); a one-minute expiry sweep; `review` and `refund_due` states an
+admin resolves by hand; unpaid mobile money blocked from dispatch.
+Confirmations by email and WhatsApp template to the shopper, alerts to the
+shop's support email and WhatsApp, each sent once. `/track` finds an order by
+number + phone (rate-limited, same answer for a wrong number or phone). Mobile
+money is offered only with `FLW_SECRET_KEY` and a UGX shop; WhatsApp only with
+Cloud API credentials. Tested with fakes of both providers, and in the browser
+against a local mock.
+
+**Not done / not verified:** the provider-docs item stays open.
+developer.flutterwave.com was blocked from the session that built this, so
+request and response shapes follow the v3 API as remembered, and fees and
+settlement weren't checked (a search result gives 4.8% per mobile money
+collection in Uganda; confirm it). Run a test-mode charge per network before
+going live. WhatsApp templates must be created and approved in Meta Business
+Manager; none exist yet. No refunds through the API: `refund_due` is resolved
+in the Flutterwave dashboard, then marked `refunded`.
 
 ---
 

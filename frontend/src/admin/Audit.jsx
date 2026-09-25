@@ -4,6 +4,7 @@ import Pager from "./Pager";
 
 const ACTIONS = {
   "order.status": "Order status",
+  "order.payment": "Payment",
   "product.create": "Product created",
   "product.price": "Price change",
   "admin.invite": "Admin invited",
