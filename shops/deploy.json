@@ -1,0 +1,14 @@
+{
+  "$comment": "One entry per live shop. Read by .github/workflows/ci-cd.yml (deploys), backup.yml and uptime.yml. Secrets are named, never stored here: add them under Settings -> Secrets and variables -> Actions. ring 0 deploys first (the canary); ring 1 only after every ring-0 shop is healthy. hold: true skips a shop's deploys without removing it. See docs/onboarding.md.",
+  "shops": [
+    {
+      "name": "bayan",
+      "ring": 0,
+      "hold": false,
+      "url": "",
+      "railway_token_secret": "RAILWAY_TOKEN",
+      "railway_service_secret": "RAILWAY_SERVICE_ID",
+      "mongo_uri_secret": "BAYAN_MONGODB_URI"
+    }
+  ]
+}

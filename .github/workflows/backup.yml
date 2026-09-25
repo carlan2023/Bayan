@@ -1,0 +1,88 @@
+name: Database backups
+
+# Nightly mongodump of every shop in shops/deploy.json (SCALING.md M10).
+#
+# Per shop, add an Actions secret named by its `mongo_uri_secret` holding the
+# database's public connection string (Railway: MongoDB service → Connect →
+# public URL). Shops without that secret are skipped with a warning, not failed.
+#
+# Where the archive goes:
+#   - BACKUP_S3_BUCKET set → uploaded to that bucket (S3 or R2) under
+#     <shop>/<date>.archive.gz[.gpg]. Also set BACKUP_S3_ACCESS_KEY_ID,
+#     BACKUP_S3_SECRET_ACCESS_KEY and, for R2, BACKUP_S3_ENDPOINT. Keep
+#     versioning/lifecycle rules on the bucket for retention.
+#   - otherwise → a workflow artifact kept for 14 days.
+# BACKUP_PASSPHRASE set → the archive is encrypted (gpg, AES256) first. It holds
+# customers' names, phone numbers and addresses: set it unless the bucket is
+# private and encrypted at rest.
+#
+# Restore: see docs/onboarding.md → "Restoring a backup".
+
+on:
+  schedule:
+    - cron: "17 1 * * *" # 01:17 UTC nightly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shops: ${{ steps.plan.outputs.shops }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        run: |
+          echo "shops=$(python3 -c 'import json; print(json.dumps({"include": json.load(open("shops/deploy.json"))["shops"]}))')" >> "$GITHUB_OUTPUT"
+
+  backup:
+    name: Back up ${{ matrix.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.shops) }}
+    env:
+      MONGO_URI: ${{ secrets[matrix.mongo_uri_secret] }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+    steps:
+      - name: Dump
+        id: dump
+        run: |
+          if [ -z "$MONGO_URI" ]; then
+            echo "::warning::${{ matrix.name }}: secret ${{ matrix.mongo_uri_secret }} is not set; skipping"
+            echo "skip=1" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          FILE="${{ matrix.name }}-$(date -u +%Y-%m-%dT%H%MZ).archive.gz"
+          # The mongo image carries mongodump; nothing to install on the runner.
+          docker run --rm -e MONGO_URI mongo:7 sh -c 'mongodump --uri "$MONGO_URI" --archive --gzip' > "$FILE"
+          [ -s "$FILE" ] || { echo "::error::empty dump"; exit 1; }
+          if [ -n "$PASSPHRASE" ]; then
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$FILE.gpg" "$FILE"
+            rm "$FILE"; FILE="$FILE.gpg"
+          else
+            echo "::warning::BACKUP_PASSPHRASE is not set; the archive is not encrypted"
+          fi
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          ls -l "$FILE"
+
+      - name: Upload to object storage
+        if: steps.dump.outputs.skip != '1' && env.BUCKET != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_S3_REGION || 'auto' }}
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          aws s3 cp "${{ steps.dump.outputs.file }}" "s3://$BUCKET/${{ matrix.name }}/${{ steps.dump.outputs.file }}" ${ENDPOINT:+--endpoint-url "$ENDPOINT"}
+
+      - name: Keep as an artifact
+        if: steps.dump.outputs.skip != '1' && env.BUCKET == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ matrix.name }}
+          path: ${{ steps.dump.outputs.file }}
+          retention-days: 14

@@ -26,7 +26,9 @@ FROM node:22-alpine
 WORKDIR /app/backend
 ENV NODE_ENV=production
 ENV PORT=8080
-# Uploaded product images live here; mount a Railway volume at /data to persist them.
+# Uploads are staged here, and stored here too unless S3/R2 is configured
+# (S3_BUCKET + S3_PUBLIC_URL, see backend/src/storage.js). With local storage,
+# mount a Railway volume at /data to persist them.
 ENV UPLOAD_DIR=/data/uploads
 
 # Bring over the built frontend and the backend (with node_modules).
@@ -36,6 +38,8 @@ COPY --from=build /app/backend ./
 
 EXPOSE 8080
 
-# Seed is idempotent (skips if products exist); the variants migration is too
-# (it only touches products with no variants yet). Then start the server.
+# The demo catalogue only loads when SEED_DEMO=1 (and never over existing
+# products), so a new shop boots empty and imports its own stock. The variants
+# migration is idempotent (it only touches products with no variants yet).
+# Then start the server.
 CMD ["sh", "-c", "node src/seed.js && node src/migrate-variants.js && node src/server.js"]

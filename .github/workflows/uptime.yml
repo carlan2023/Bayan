@@ -1,0 +1,51 @@
+name: Uptime
+
+# Hourly, check each shop's /api/health (which answers 503 when the
+# database is unreachable). A failed run is emailed by GitHub to whoever
+# watches the repository's Actions, so a shop that is down pages someone.
+# Shops with no `url` in shops/deploy.json are skipped.
+#
+# This is a floor, not a replacement for a real monitor: scheduled workflows
+# can start late under load, and each run bills at least a minute of Actions
+# time on a private repo, which is why it is hourly rather than every 5 min. For paging within a minute, point an external
+# checker (UptimeRobot, Better Stack, Railway's own) at the same URL.
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every shop
+        run: |
+          python3 - <<'PY'
+          import json, sys, time, urllib.request
+          down = []
+          for s in json.load(open("shops/deploy.json"))["shops"]:
+              url = (s.get("url") or "").rstrip("/")
+              if not url:
+                  continue
+              for attempt in range(3):  # ride out a single blip
+                  try:
+                      with urllib.request.urlopen(url + "/api/health", timeout=15) as r:
+                          body = json.load(r)
+                      if body.get("ok"):
+                          print(f"up    {s['name']}")
+                          break
+                  except Exception as e:
+                      err = str(e)
+                  time.sleep(10)
+              else:
+                  print(f"DOWN  {s['name']}  {url}")
+                  down.append(s["name"])
+          if down:
+              print(f"::error::Down: {', '.join(down)}")
+              sys.exit(1)
+          PY
