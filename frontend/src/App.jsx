@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider, CartProvider, ConfigProvider, WishlistProvider } from "./store";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -26,11 +27,34 @@ import TrackOrder from "./pages/TrackOrder";
 import AdminTeam from "./admin/Team";
 import AdminAudit from "./admin/Audit";
 
+/**
+ * Move focus to the page on client-side navigation. Without it, a keyboard or
+ * screen-reader user who follows a link stays on that link in the old page's
+ * DOM position and hears nothing about the new page. The first render is left
+ * alone so a fresh load starts at the top as usual.
+ */
+function useRouteFocus(ref) {
+  const { pathname } = useLocation();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    ref.current?.focus({ preventScroll: true });
+  }, [pathname, ref]);
+}
+
 function ShopLayout() {
+  const main = useRef(null);
+  useRouteFocus(main);
   return (
     <>
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <Header />
-      <main>
+      <main id="main" ref={main} tabIndex={-1}>
         <Outlet />
       </main>
       <Footer />

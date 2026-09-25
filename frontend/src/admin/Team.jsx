@@ -77,7 +77,7 @@ export default function Team() {
       )}
 
       <form className="admin-panel form-grid" onSubmit={invite}>
-        <h3>Invite an admin</h3>
+        <h2>Invite an admin</h2>
         <p className="hint">
           They get full access to products, orders, customers and settings. The link works once and expires in 7 days.
         </p>
@@ -114,7 +114,7 @@ export default function Team() {
       </form>
 
       <div className="admin-panel">
-        <h3>Admins</h3>
+        <h2>Admins</h2>
         {!team ? (
           <div className="spinner">Loading…</div>
         ) : (
@@ -125,7 +125,7 @@ export default function Team() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Admin since</th>
-                  <th></th>
+                  <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -163,7 +163,7 @@ export default function Team() {
 
       {team?.invites.length > 0 && (
         <div className="admin-panel">
-          <h3>Pending invites</h3>
+          <h2>Pending invites</h2>
           <div className="table-scroll">
             <table className="admin-table">
               <thead>
@@ -171,7 +171,7 @@ export default function Team() {
                   <th>Email</th>
                   <th>Invited by</th>
                   <th>Expires</th>
-                  <th></th>
+                  <th><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

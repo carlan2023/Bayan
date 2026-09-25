@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { usePageTitle } from "../usePageTitle";
 import { api } from "../api";
 import { useConfig, useCopy } from "../store";
 import { useAsync } from "../useAsync";
@@ -22,6 +23,7 @@ function orderedCategories(cats, departments) {
 }
 
 export default function Home() {
+  usePageTitle(null);
   // Hero, perks and departments are the shop's own, from Admin → Settings.
   const { copy } = useConfig();
   const t = useCopy();

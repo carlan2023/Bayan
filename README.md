@@ -159,6 +159,12 @@ Setup (per shop): set `FLW_SECRET_KEY` and `FLW_SECRET_HASH`, and in the Flutter
 
 Notifications go out when an order becomes real: at creation for cash on delivery, and on confirmed payment for mobile money. Email uses the Resend setup above. WhatsApp uses the Cloud API and needs two approved templates (`order_confirmation`, `new_order_alert`; parameters are listed in `backend/src/whatsapp.js`). Each side is sent once per order however many times a webhook fires.
 
+## Accessibility and SEO
+
+The storefront and admin are kept at zero axe-core violations (see SPRINT.md Milestone 6 for how that was measured). Pages set their own titles with `usePageTitle()`. Focus moves to `<main>` on navigation. Colours that carry text are derived to reach 4.5:1 for any palette an owner picks.
+
+For crawlers and link previews, the server renders each URL's title, description, canonical link, Open Graph tags and schema.org JSON-LD into the HTML (`backend/src/seo.js`), answers unknown URLs with 404, and serves `/robots.txt` and `/sitemap.xml`. Set `APP_URL` so canonical and sitemap URLs use the shop's public domain.
+
 ## Shop operations
 
 ```bash

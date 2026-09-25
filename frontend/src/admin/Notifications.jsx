@@ -108,7 +108,7 @@ export default function Notifications({ variant = "sidebar" }) {
           <div className="notif-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
           <aside className="notif-panel" ref={panelRef} aria-label="Admin activity feed">
             <div className="notif-head">
-              <h3>Activity</h3>
+              <h2>Activity</h2>
               {unread > 0 && (
                 <button type="button" className="link-btn" onClick={markAll}>
                   Mark all read

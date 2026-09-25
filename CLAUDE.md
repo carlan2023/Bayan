@@ -72,6 +72,11 @@ shops/                 provision files and deploy.json (the per-shop CI matrix)
 - **Admin routes** re-check `is_admin` in the DB on every request
   (`requireAdmin`); use it for any new admin router. Changes to prices, order
   status, team or settings are written to the audit log (`audit()`).
+- **Accessibility**: every page calls `usePageTitle()` and has exactly one
+  `<h1>`; text on a coloured fill uses a contrast-derived token
+  (`--clay-fill`, `--on-primary`), not the raw palette colour; no
+  `outline: none` without a replacement. New client routes must be added to
+  `ROUTES` in `backend/src/seo.js` or they will be served as 404s.
 - Settings, product and import payloads are validated whole on the server;
   pure validators live apart from the DB so they can be unit-tested.
 

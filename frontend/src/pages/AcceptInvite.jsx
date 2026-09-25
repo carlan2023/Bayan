@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../store";
@@ -10,6 +11,7 @@ import ErrorState from "../components/ErrorState";
  * here; an address that already has an account proves it with its password.
  */
 export default function AcceptInvite() {
+  usePageTitle("Join the shop team");
   const [params] = useSearchParams();
   const token = params.get("token") || "";
   const { signIn } = useAuth();

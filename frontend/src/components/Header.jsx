@@ -68,7 +68,11 @@ export default function Header() {
 
   return (
     <>
-      {copy.topbar && <div className="topbar">{t(copy.topbar)}</div>}
+      {copy.topbar && (
+        <aside className="topbar" aria-label="Shop announcement">
+          {t(copy.topbar)}
+        </aside>
+      )}
       <header className="header">
         <div className="container header-inner">
           <button
