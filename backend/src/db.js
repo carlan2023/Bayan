@@ -108,6 +108,9 @@ productSchema.index({ created_at: -1 });
 productSchema.index({ "variants.stock": 1 });
 
 export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
+export const PAYMENT_METHODS = ["cod", "mobile_money"];
+/** See src/payments.js for the transitions between these. */
+export const PAYMENT_STATUSES = ["on_delivery", "pending", "paid", "failed", "expired", "review", "refund_due", "refunded"];
 
 const orderSchema = new mongoose.Schema(
   {
@@ -119,7 +122,35 @@ const orderSchema = new mongoose.Schema(
     address: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     note: { type: String, default: null },
-    payment_method: { type: String, default: "cod" },
+    payment_method: { type: String, enum: PAYMENT_METHODS, default: "cod" },
+    // Separate from `status` (fulfilment): cash is "on_delivery" until the
+    // courier collects it; mobile money starts "pending" and only a verified
+    // provider result moves it on. See src/payments.js.
+    payment_status: { type: String, enum: PAYMENT_STATUSES, default: "on_delivery", index: true },
+    payment: {
+      provider: { type: String, default: null },
+      network: { type: String, default: null }, // MTN | AIRTEL
+      payer_phone: { type: String, default: null },
+      tx_ref: { type: String, default: null },
+      provider_id: { type: String, default: null },
+      amount_cents: { type: Number, default: null }, // what the provider says was paid
+      currency: { type: String, default: null },
+      expires_at: { type: Date, default: null },
+      paid_at: { type: Date, default: null },
+      failure_reason: { type: String, default: null },
+      last_checked_at: { type: Date, default: null },
+    },
+    // Claimed (false → true) by whichever path gives this order's units back
+    // — admin cancel, a failed or expired payment — so they return exactly once.
+    stock_released: { type: Boolean, default: false },
+    // sha256 of the token a guest's browser holds to poll its own payment.
+    access_token_hash: { type: String, default: null },
+    // When confirmations went out; claimed atomically so a repeated webhook
+    // can never message the shopper twice.
+    notified: {
+      customer_at: { type: Date, default: null },
+      shop_at: { type: Date, default: null },
+    },
     status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
     items: [
       {
@@ -156,6 +187,8 @@ const orderSchema = new mongoose.Schema(
         }));
         delete ret._id;
         delete ret.user;
+        delete ret.access_token_hash;
+        delete ret.stock_released;
         return ret;
       },
     },
@@ -166,6 +199,10 @@ const orderSchema = new mongoose.Schema(
 // customer's own history filters by user and does the same.
 orderSchema.index({ status: 1, created_at: -1 });
 orderSchema.index({ user: 1, created_at: -1 });
+// Webhooks find the order by the reference we gave the provider.
+orderSchema.index({ "payment.tx_ref": 1 }, { unique: true, partialFilterExpression: { "payment.tx_ref": { $type: "string" } } });
+// The expiry sweep looks for pending payments past their deadline.
+orderSchema.index({ payment_status: 1, "payment.expires_at": 1 });
 
 const counterSchema = new mongoose.Schema({ _id: String, seq: { type: Number, default: 0 } });
 

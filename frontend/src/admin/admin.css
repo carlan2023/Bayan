@@ -265,3 +265,7 @@
 .import-preview { max-height: 320px; overflow: auto; margin-bottom: 12px; }
 .settings-page input[type="color"] { width: 44px; height: 34px; padding: 2px; flex: none; cursor: pointer; }
 .settings-page .palette-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); }
+.pay-badge { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); white-space: nowrap; }
+.pay-badge.pay-paid { background: var(--pine-tint); border-color: var(--pine-line); }
+.pay-badge.pay-pending { background: var(--gold-tint); }
+.pay-badge.pay-failed, .pay-badge.pay-expired, .pay-badge.pay-review, .pay-badge.pay-refund_due { background: var(--danger-tint); border-color: var(--danger-line); }

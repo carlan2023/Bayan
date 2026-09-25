@@ -11,7 +11,9 @@ import { publishUpload, getStore, uploadDir } from "../storage.js";
 import { slugify, validateProduct, productFields, variantFields } from "../product-fields.js";
 import { LOW_STOCK_THRESHOLD } from "../config.js";
 import { variantLabel } from "../variants.js";
-import { restoreStock } from "../inventory.js";
+import { releaseOrderStock } from "../inventory.js";
+import { FULFILLABLE, MANUAL } from "../payments.js";
+import { transition } from "../payment-service.js";
 import { audit, AuditLog, AUDIT_ACTIONS, priceSnapshot, samePrices } from "../audit.js";
 import { AuthToken, issueToken, INVITE_TTL_MS } from "../auth-tokens.js";
 import { sendEmail, appUrl, emailEnabled, escapeHtml } from "../mailer.js";
@@ -395,6 +397,12 @@ router.patch("/orders/:id", async (req, res, next) => {
 
     const previous = order.status;
     if (previous === status) return res.json({ order, restock_skipped: [] });
+    // An unpaid mobile money order must not be packed and sent.
+    if (status !== "cancelled" && status !== "pending" && !FULFILLABLE.includes(order.payment_status)) {
+      return res.status(409).json({
+        error: `Order #${order.number} can't be ${status} while its payment is ${order.payment_status.replace("_", " ")}.`,
+      });
+    }
 
     // Claim the transition with a conditional write before touching stock: two
     // admins cancelling the same order at once must restock it exactly once.
@@ -407,12 +415,12 @@ router.patch("/orders/:id", async (req, res, next) => {
       return res.status(409).json({ error: "This order was just changed by someone else — reload and try again." });
     }
 
-    // Return stock to the exact size/colour when an order is cancelled (once).
+    // Return stock to the exact size/colour when an order is cancelled (once,
+    // however many paths try: see releaseOrderStock).
     let restock_skipped = [];
+    let result = updated;
     if (status === "cancelled") {
-      const skipped = await restoreStock(
-        order.items.map((i) => ({ product_id: i.product, size: i.size, color: i.color, qty: i.qty, name: i.name }))
-      );
+      const { skipped } = await releaseOrderStock(order);
       restock_skipped = skipped.map((s) => ({ name: s.name, variant: variantLabel(s), qty: s.qty }));
       if (skipped.length) {
         // The variant was removed since the order was placed; don't guess
@@ -427,6 +435,15 @@ router.patch("/orders/:id", async (req, res, next) => {
       }
     }
 
+    // Money follows fulfilment: cash is collected on delivery; a paid order
+    // that is cancelled is owed back.
+    if (status === "delivered" && updated.payment_status === "on_delivery") {
+      result = (await transition(updated, "on_delivery", "paid", { actor: req.user })) || result;
+    }
+    if (status === "cancelled" && updated.payment_status === "paid") {
+      result = (await transition(updated, "paid", "refund_due", { actor: req.user, reason: "order cancelled" })) || result;
+    }
+
     await audit(req.user, "order.status", {
       target_type: "order",
       target_id: order._id,
@@ -434,11 +451,32 @@ router.patch("/orders/:id", async (req, res, next) => {
       before: { status: previous },
       after: { status, ...(restock_skipped.length ? { restock_skipped } : {}) },
     });
-    res.json({ order: updated, restock_skipped });
+    res.json({ order: result, restock_skipped });
   } catch (err) {
     next(err);
   }
 });
+/**
+ * Resolve a payment by hand: a short or wrong-currency payment in review, or
+ * a refund made in the Flutterwave dashboard. Audited.
+ */
+router.patch("/orders/:id/payment", async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid order id" });
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    const to = req.body?.payment_status;
+    if (!(MANUAL[order.payment_status] || []).includes(to)) {
+      return res.status(400).json({ error: `A ${order.payment_status} payment can't be marked ${to} by hand` });
+    }
+    const updated = await transition(order, order.payment_status, to, { actor: req.user, reason: "marked by an admin" });
+    if (!updated) return res.status(409).json({ error: "This payment just changed — reload and try again." });
+    res.json({ order: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 /* ================= Products ================= */
 

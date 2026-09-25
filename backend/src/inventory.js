@@ -1,4 +1,4 @@
-import { Product } from "./db.js";
+import { Product, Order } from "./db.js";
 import { variantFilter, variantInc } from "./variants.js";
 
 /**
@@ -21,4 +21,21 @@ export async function restoreStock(lines) {
     )
   );
   return lines.filter((_l, i) => results[i].modifiedCount === 0);
+}
+
+/**
+ * Give an order's units back, once. Every path that can abandon an order —
+ * an admin cancelling it, a mobile money payment failing or expiring — goes
+ * through here, and the stock_released flag is claimed with a conditional
+ * write first, so two of them racing restock it exactly once.
+ *
+ * @returns { released, skipped } — skipped as restoreStock()
+ */
+export async function releaseOrderStock(order) {
+  const claimed = await Order.updateOne({ _id: order._id, stock_released: { $ne: true } }, { $set: { stock_released: true } });
+  if (claimed.modifiedCount !== 1) return { released: false, skipped: [] };
+  const skipped = await restoreStock(
+    order.items.map((i) => ({ product_id: i.product, size: i.size, color: i.color, qty: i.qty, name: i.name }))
+  );
+  return { released: true, skipped };
 }

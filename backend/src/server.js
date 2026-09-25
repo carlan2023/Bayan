@@ -18,6 +18,9 @@ import wishlistRoutes from "./routes/wishlist.js";
 import adminRoutes, { UPLOAD_DIR } from "./routes/admin.js";
 import adminSettingsRoutes from "./routes/admin-settings.js";
 import adminImportRoutes from "./routes/admin-import.js";
+import paymentRoutes from "./routes/payments.js";
+import { startPaymentSweeper } from "./payment-service.js";
+import { mobileMoneyEnabled, MOBILE_MONEY_NETWORKS } from "./flutterwave.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -100,9 +103,24 @@ app.get("/api/health", (_req, res) => {
 // totals from these, and routes/orders.js charges from the same cached read.
 // `email_enabled` tells the client whether to offer "Forgot password?" — a
 // capability of this deployment rather than a shop setting.
+/**
+ * What the client is told: the shop's settings plus what this deployment can
+ * do (email for password reset; which payment methods are live — mobile money
+ * only with Flutterwave keys and a currency it serves).
+ */
+async function clientConfig() {
+  const settings = await getSettings();
+  const momo = mobileMoneyEnabled(settings.currency);
+  return {
+    ...publicConfig(settings),
+    email_enabled: emailEnabled(),
+    payment_methods: momo ? ["cod", "mobile_money"] : ["cod"],
+    mobile_money_networks: momo ? MOBILE_MONEY_NETWORKS : [],
+  };
+}
 app.get("/api/config", async (_req, res, next) => {
   try {
-    res.json({ ...publicConfig(await getSettings()), email_enabled: emailEnabled() });
+    res.json(await clientConfig());
   } catch (err) {
     next(err);
   }
@@ -119,6 +137,7 @@ app.get("/api/hero", async (_req, res, next) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 // Mounted before the general admin router; each applies the admin gate itself.
 app.use("/api/admin/settings", adminSettingsRoutes);
@@ -160,7 +179,7 @@ if (fs.existsSync(distDir)) {
     try {
       // SPA fallback, with this shop's title, theme and config written in so
       // the first paint is already theirs (see src/shell.js).
-      const html = renderShell(indexHtml, { ...publicConfig(await getSettings()), email_enabled: emailEnabled() });
+      const html = renderShell(indexHtml, await clientConfig());
       res.set("Cache-Control", "no-cache").type("html").send(html);
     } catch {
       res.sendFile(path.join(distDir, "index.html")); // settings unreadable: default shell
@@ -186,6 +205,8 @@ if (isEntryPoint) {
       app.listen(PORT, () => console.log(`Bayan API running on http://localhost:${PORT}`));
       // Daily reminders for anything still low on stock.
       startStockAlerts();
+      // Expire mobile money payments nobody approved, giving their stock back.
+      startPaymentSweeper();
     })
     .catch((err) => {
       console.error("Failed to connect to MongoDB:", err.message);
