@@ -4,15 +4,20 @@ import helmet from "helmet";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
+import mongoose from "mongoose";
 import { connectDB, Setting } from "./db.js";
 import { startStockAlerts } from "./stock-alerts.js";
-import { publicConfig } from "./config.js";
+import { getSettings, publicConfig } from "./config.js";
+import { renderShell } from "./shell.js";
 import { emailEnabled } from "./mailer.js";
+import { storageOrigin } from "./storage.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
 import wishlistRoutes from "./routes/wishlist.js";
 import adminRoutes, { UPLOAD_DIR } from "./routes/admin.js";
+import adminSettingsRoutes from "./routes/admin-settings.js";
+import adminImportRoutes from "./routes/admin-import.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +35,7 @@ const cspImgHosts = (process.env.CSP_IMG_HOSTS || "")
   .split(",")
   .map((s) => s.trim())
   .filter((s) => /^https:\/\/[^\s'";]+$/.test(s));
+const storageHosts = [storageOrigin()].filter(Boolean);
 
 app.use(
   helmet({
@@ -47,9 +53,10 @@ app.use(
         // elsewhere must add that host to CSP_IMG_HOSTS (comma-separated), or
         // upload the file instead — uploads always work. data: is for the
         // generated SVG placeholders, blob: for admin upload previews.
-        imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", ...cspImgHosts],
+        // With S3/R2 storage, uploads are served from the bucket's public origin.
+        imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", ...cspImgHosts, ...storageHosts],
         // Hero banner video is always an upload (enforced in routes/admin.js).
-        mediaSrc: ["'self'", "blob:"],
+        mediaSrc: ["'self'", "blob:", ...storageHosts],
         connectSrc: ["'self'"],
         // wa.me "Ask on WhatsApp" links are plain <a target="_blank">
         // navigations, which CSP does not govern — nothing to allow here.
@@ -81,13 +88,25 @@ if (corsOrigins.length > 0) {
 
 app.use(express.json({ limit: "100kb" }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "bayan-api" }));
-// Storefront constants (currency, delivery pricing) — the client reads these
-// instead of hard-coding them, so quoted totals always match what we charge.
-// `email_enabled` tells the client whether to offer "Forgot password?" — it is
-// a capability of this deployment, not a commerce constant, so it is added
-// here rather than in config.js.
-app.get("/api/config", (_req, res) => res.json({ ...publicConfig(), email_enabled: emailEnabled() }));
+// Uptime monitors and Railway's healthcheck hit this. It reports the database
+// too: a process that is up but has lost Mongo cannot take an order, and a
+// monitor that only saw "ok" would never page anyone about it.
+app.get("/api/health", (_req, res) => {
+  const db = mongoose.connection.readyState === 1;
+  res.status(db ? 200 : 503).json({ ok: db, db, service: "bayan-api" });
+});
+// The shop's public settings: brand, palette, fonts, copy, departments and the
+// commerce rules (currency, delivery pricing, per-line cap). The client quotes
+// totals from these, and routes/orders.js charges from the same cached read.
+// `email_enabled` tells the client whether to offer "Forgot password?" — a
+// capability of this deployment rather than a shop setting.
+app.get("/api/config", async (_req, res, next) => {
+  try {
+    res.json({ ...publicConfig(await getSettings()), email_enabled: emailEnabled() });
+  } catch (err) {
+    next(err);
+  }
+});
 // Landing-page hero media (admin-managed). Null until an admin sets one.
 app.get("/api/hero", async (_req, res, next) => {
   try {
@@ -101,6 +120,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+// Mounted before the general admin router; each applies the admin gate itself.
+app.use("/api/admin/settings", adminSettingsRoutes);
+app.use("/api/admin/import", adminImportRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Uploaded product images (persisted on a volume in production). nosniff stops
@@ -129,10 +151,20 @@ app.use("/uploads", (_req, res) => res.status(404).type("text/plain").send("Not 
 // so the SPA and API share one origin and no CORS/proxy config is needed.
 const distDir = process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist");
 if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
-  app.get("*", (req, res, next) => {
+  // index: false — "/" must go through the personalised shell below rather
+  // than being served as the raw built file.
+  app.use(express.static(distDir, { index: false }));
+  const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+  app.get("*", async (req, res, next) => {
     if (req.path.startsWith("/api")) return next();
-    res.sendFile(path.join(distDir, "index.html")); // SPA fallback
+    try {
+      // SPA fallback, with this shop's title, theme and config written in so
+      // the first paint is already theirs (see src/shell.js).
+      const html = renderShell(indexHtml, { ...publicConfig(await getSettings()), email_enabled: emailEnabled() });
+      res.set("Cache-Control", "no-cache").type("html").send(html);
+    } catch {
+      res.sendFile(path.join(distDir, "index.html")); // settings unreadable: default shell
+    }
   });
   console.log(`Serving frontend from ${distDir}`);
 }

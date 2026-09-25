@@ -1,14 +1,15 @@
-import { fmtPrice } from "../api";
+import { useMoney } from "../store";
+
 
 /**
  * Tells the shopper what changed when the cart was re-priced against the
  * catalogue. Prices are re-read from the DB at checkout, so a silent change
  * here would mean paying a different total than the one on screen.
  */
-const describe = (c) => {
+const describe = (c, money) => {
   switch (c.kind) {
     case "price":
-      return `${c.name} is now ${fmtPrice(c.to)} (was ${fmtPrice(c.from)}).`;
+      return `${c.name} is now ${money(c.to)} (was ${money(c.from)}).`;
     case "qty":
       return `${c.name} — only ${c.to} left, so we reduced the quantity.`;
     case "soldout":
@@ -21,6 +22,7 @@ const describe = (c) => {
 };
 
 export default function CartNotice({ changes }) {
+  const money = useMoney();
   if (!changes || changes.length === 0) return null;
 
   return (
@@ -28,7 +30,7 @@ export default function CartNotice({ changes }) {
       <strong>Your bag was updated</strong>
       <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
         {changes.map((c, i) => (
-          <li key={i}>{describe(c)}</li>
+          <li key={i}>{describe(c, money)}</li>
         ))}
       </ul>
     </div>

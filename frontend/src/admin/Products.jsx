@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, fmtPrice } from "../api";
+import { api } from "../api";
+import { useConfig, useMoney } from "../store";
 import Pager from "./Pager";
 import ProductForm, { emptyForm, toForm } from "./ProductForm";
+import ImportPanel from "./ImportPanel";
 
 const PAGE_SIZE = 25;
 
@@ -9,6 +11,8 @@ const PAGE_SIZE = 25;
 const soldOutCount = (p) => (p.variants || []).filter((v) => v.stock <= 0).length;
 
 export default function Products() {
+  const money = useMoney();
+  const { currency, departments } = useConfig();
   const [page, setPage] = useState(1);
   // Server-side search: the old client-side filter could only narrow the 100
   // products the public endpoint would return, so the rest were unreachable.
@@ -19,6 +23,7 @@ export default function Products() {
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(
     () =>
@@ -87,10 +92,14 @@ export default function Products() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          <button className="btn btn-ghost btn-sm" onClick={() => setImporting((v) => !v)} aria-expanded={importing}>
+            Import
+          </button>
           <button
             className="btn btn-accent btn-sm"
             onClick={() => {
-              setForm(emptyForm());
+              setImporting(false);
+              setForm(emptyForm(departments));
               setEditingId(null);
               setError("");
             }}
@@ -103,6 +112,16 @@ export default function Products() {
       {notice && <div className="alert alert-ok">{notice}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
+      {importing && (
+        <ImportPanel
+          onClose={() => setImporting(false)}
+          onDone={(message) => {
+            setNotice(message);
+            load();
+          }}
+        />
+      )}
+
       {form && (
         <ProductForm
           // Remount per product so switching Edit targets resets the form.
@@ -110,6 +129,8 @@ export default function Products() {
           initial={form}
           editingId={editingId}
           onSaved={onSaved}
+          currency={currency}
+          categories={(departments || []).map((d) => d.name)}
           onCancel={() => {
             setForm(null);
             setEditingId(null);
@@ -147,7 +168,7 @@ export default function Products() {
                     </div>
                   </td>
                   <td>{p.category}</td>
-                  <td className="num">{fmtPrice(p.price_cents)}</td>
+                  <td className="num">{money(p.price_cents)}</td>
                   <td className="num">
                     <span style={{ color: p.stock <= 10 ? "var(--danger)" : "inherit" }}>{p.stock}</span>
                     {soldOutCount(p) > 0 && (

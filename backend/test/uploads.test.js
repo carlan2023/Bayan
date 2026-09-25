@@ -8,7 +8,7 @@ import {
   VIDEO_EXTENSIONS,
   sniffType,
   uploadFilename,
-  finaliseUpload,
+  identifyUpload,
   claimsImage,
 } from "../src/uploads.js";
 
@@ -81,32 +81,31 @@ function tempDirs() {
   return { root, incoming };
 }
 
-test("finaliseUpload publishes a real image under the sniffed extension", async () => {
-  const { root, incoming } = tempDirs();
+test("identifyUpload vouches for a real image and leaves it in place", async () => {
+  const { incoming } = tempDirs();
   const tmp = path.join(incoming, "x.part");
   fs.writeFileSync(tmp, PNG);
-  const out = await finaliseUpload(tmp, root, ["image"]);
-  assert.match(out.filename, /\.png$/);
-  assert.ok(fs.existsSync(path.join(root, out.filename)));
-  assert.ok(!fs.existsSync(tmp), "temp file is moved, not copied");
+  const type = await identifyUpload(tmp, ["image"]);
+  assert.equal(type.ext, ".png");
+  assert.ok(fs.existsSync(tmp), "publishing (and removing the temp file) is the caller's job");
 });
 
-test("finaliseUpload deletes an HTML file sent as image/png", async () => {
+test("identifyUpload deletes an HTML file sent as image/png", async () => {
   const { root, incoming } = tempDirs();
   const tmp = path.join(incoming, "x.part");
   fs.writeFileSync(tmp, "<html><body><script>alert(document.cookie)</script></body></html>");
-  await assert.rejects(finaliseUpload(tmp, root, ["image"]), /isn't a JPEG, PNG or WebP/);
+  await assert.rejects(identifyUpload(tmp, ["image"]), /isn't a JPEG, PNG or WebP/);
   assert.ok(!fs.existsSync(tmp), "rejected upload is removed");
   assert.deepEqual(fs.readdirSync(root), [".incoming"], "nothing reached the public directory");
 });
 
-test("finaliseUpload refuses video on the image-only endpoint", async () => {
-  const { root, incoming } = tempDirs();
+test("identifyUpload refuses video on the image-only endpoint", async () => {
+  const { incoming } = tempDirs();
   const tmp = path.join(incoming, "x.part");
   fs.writeFileSync(tmp, ftyp("isom"));
-  await assert.rejects(finaliseUpload(tmp, root, ["image"]));
+  await assert.rejects(identifyUpload(tmp, ["image"]));
   const tmp2 = path.join(incoming, "y.part");
   fs.writeFileSync(tmp2, ftyp("isom"));
-  const ok = await finaliseUpload(tmp2, root, ["image", "video"]);
+  const ok = await identifyUpload(tmp2, ["image", "video"]);
   assert.equal(ok.kind, "video");
 });

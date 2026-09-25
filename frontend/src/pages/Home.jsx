@@ -1,20 +1,32 @@
 import { Link } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useConfig } from "../store";
+import { api } from "../api";
+import { useConfig, useCopy } from "../store";
 import { useAsync } from "../useAsync";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
 import WhatsAppFloat from "../components/WhatsAppFloat";
+import { departmentBackground, useDepartments } from "../components/departments";
 
-const CAT_COLORS = {
-  Women: "linear-gradient(135deg, #2e4b3f, #4a6b5a)",
-  Men: "linear-gradient(135deg, #22303a, #40566b)",
-  Kids: "linear-gradient(135deg, #b06a4d, #cf8a66)",
-  Accessories: "linear-gradient(135deg, #6e5a43, #c9a24b)",
-};
+/**
+ * Departments with products, in the owner's configured order; categories the
+ * settings don't list yet (a fresh import) follow alphabetically rather than
+ * disappearing.
+ */
+function orderedCategories(cats, departments) {
+  const rank = new Map(departments.map((d, i) => [d.name.toLowerCase(), i]));
+  return [...cats].sort((a, b) => {
+    const ra = rank.get(a.category.toLowerCase()) ?? Infinity;
+    const rb = rank.get(b.category.toLowerCase()) ?? Infinity;
+    return ra - rb || a.category.localeCompare(b.category);
+  });
+}
 
 export default function Home() {
-  const { free_delivery_threshold_cents, delivery_fee_cents } = useConfig();
+  // Hero, perks and departments are the shop's own, from Admin → Settings.
+  const { copy } = useConfig();
+  const t = useCopy();
+  const departments = useDepartments();
+  const heroCopy = copy.hero || {};
 
   // One fetch for both strips: if either fails the page says so instead of
   // silently rendering empty grids under their headings.
@@ -26,7 +38,7 @@ export default function Home() {
     []
   );
   const featured = data?.featured ?? [];
-  const cats = data?.cats ?? [];
+  const cats = orderedCategories(data?.cats ?? [], departments);
 
   // Hero media is set by the admin (Storefront page); the gradient is the
   // fallback, so a failed fetch just means the default look.
@@ -61,16 +73,14 @@ export default function Home() {
           {hero && <div className="hero-scrim" aria-hidden="true" />}
 
           <div className="hero-content">
-            <div className="eyebrow">New season · SS26</div>
+            {heroCopy.eyebrow && <div className="eyebrow">{t(heroCopy.eyebrow)}</div>}
             <h1>
-              Dress well. Live well. <em>Pay at your door.</em>
+              {t(heroCopy.headline)}
+              {heroCopy.headline_emphasis && <> <em>{t(heroCopy.headline_emphasis)}</em></>}
             </h1>
-            <p>
-              Considered clothing, jewellery and fragrance in natural fabrics and
-              honest colours — delivered countrywide with cash on delivery.
-            </p>
+            {heroCopy.body && <p>{t(heroCopy.body)}</p>}
             <Link to="/shop" className="btn btn-accent">
-              Shop the collection
+              {t(heroCopy.cta) || "Shop now"}
             </Link>
           </div>
         </section>
@@ -96,9 +106,9 @@ export default function Home() {
               {cats.map((c) => (
                 <Link
                   key={c.category}
-                  to={`/shop?category=${c.category}`}
+                  to={`/shop?category=${encodeURIComponent(c.category)}`}
                   className="cat-card"
-                  style={{ background: CAT_COLORS[c.category] || CAT_COLORS.Accessories }}
+                  style={{ background: departmentBackground(departments, c.category) }}
                 >
                   <h3>{c.category}</h3>
                   <span>{c.count} pieces</span>
@@ -123,31 +133,18 @@ export default function Home() {
         </>
       )}
 
-      <section className="section container">
-        <div className="perks">
-          <div className="perk">
-            <h3>Cash on delivery</h3>
-            <p>
-              Order now, pay when your parcel reaches your hands. No card
-              required.
-            </p>
+      {copy.perks?.length > 0 && (
+        <section className="section container">
+          <div className="perks">
+            {copy.perks.map((perk, i) => (
+              <div className="perk" key={i}>
+                <h3>{t(perk.title)}</h3>
+                <p>{t(perk.body)}</p>
+              </div>
+            ))}
           </div>
-          <div className="perk">
-            <h3>Free delivery over {fmtPrice(free_delivery_threshold_cents)}</h3>
-            <p>
-              Flat {fmtPrice(delivery_fee_cents)} delivery on smaller orders, anywhere in the
-              country.
-            </p>
-          </div>
-          <div className="perk">
-            <h3>Genuine &amp; quality-checked</h3>
-            <p>
-              Every piece — from jewellery to fragrance — is sourced authentic
-              and inspected before it ships.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <WhatsAppFloat />
     </>

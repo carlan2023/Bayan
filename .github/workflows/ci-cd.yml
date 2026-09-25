@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      shops:
+        description: "Deploy only these shops (comma-separated names from shops/deploy.json); empty = all not on hold"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,7 +60,21 @@ jobs:
           MONGO_TEST_URI: mongodb://localhost:27017
 
       - name: Seed database
-        run: node src/seed.js
+        # The demo catalogue is opt-in; without --demo a boot seeds nothing.
+        run: |
+          node src/seed.js | grep -q "skipping seed" || { echo "::error::seed ran without --demo"; exit 1; }
+          node src/seed.js --demo
+
+      - name: Provision is idempotent
+        # Onboarding a shop twice must converge, not duplicate: a scratch
+        # database, the example shop file, run twice.
+        run: |
+          export MONGODB_URI=mongodb://localhost:27017/bayan_ci_provision PROVISION_OWNER_PASSWORD=ci-owner-pass
+          node src/provision.js ../shops/example.json | tee /tmp/p1.log
+          node src/provision.js ../shops/example.json | tee /tmp/p2.log
+          grep -q "Created admin account owner@acme.example" /tmp/p1.log || { echo "::error::owner not created"; exit 1; }
+          grep -q "already an admin" /tmp/p2.log || { echo "::error::second run did not find the owner"; exit 1; }
+          grep -q "Catalogue: 0 new, 3 updated" /tmp/p2.log || { echo "::error::second run duplicated the catalogue"; exit 1; }
 
       - name: Variants migration is a no-op on a fresh seed
         run: |
@@ -217,6 +237,23 @@ jobs:
             -d "{\"customer_name\":\"CI Over\",\"phone\":\"0700000003\",\"address\":\"4 Test St\",\"city\":\"Kampala\",\"items\":[$(line "$V" $((SSTOCK + 1)))]}")
           echo "$OVER" | grep -q "left in stock" || fail "over-stock line was not rejected with the variant's count: $OVER"
 
+          # Settings drive the money path: a changed delivery fee is quoted by
+          # /api/config and charged by POST /api/orders at once.
+          curl -sf localhost:4000/api/config | python3 -c '
+          import json, sys
+          c = json.load(sys.stdin)
+          missing = [k for k in ("shop_name", "palette", "fonts", "copy", "departments", "currency", "free_delivery_threshold_cents", "delivery_fee_cents") if k not in c]
+          sys.exit("config is missing: %s" % missing if missing else 0)' || fail "/api/config does not serve the settings shape"
+          curl -sf -X PUT localhost:4000/api/admin/settings -H "Authorization: Bearer $ADMIN" \
+            -H 'Content-Type: application/json' -d '{"delivery_fee_cents": 123400, "free_delivery_threshold_cents": 999999999}' > /dev/null \
+            || fail "settings update failed"
+          curl -sf localhost:4000/api/config | grep -q '"delivery_fee_cents":123400' || fail "config did not pick up the new fee"
+          V=$(pick_variant) || fail "no in-stock variant for the fee check"
+          FEE=$(curl -sf -X POST localhost:4000/api/orders -H 'Content-Type: application/json' \
+            -d "{\"customer_name\":\"CI Fee\",\"phone\":\"0700000004\",\"address\":\"5 Test St\",\"city\":\"Kampala\",\"items\":[$(line "$V" 1)]}" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['delivery_cents'])")
+          [ "$FEE" = "123400" ] || fail "order charged delivery $FEE, expected the new fee 123400"
+
           # Security headers
           curl -sI localhost:4000/api/health | grep -qi "content-security-policy" || fail "CSP header missing"
 
@@ -251,20 +288,87 @@ jobs:
           path: frontend/dist
           retention-days: 7
 
-  deploy:
-    name: Deploy to Railway
+  # ---- Deploy: one Railway service per shop, from shops/deploy.json ----
+  # Ring 0 (the canary) goes first; ring 1 only after every ring-0 shop built,
+  # deployed and answered its health check. `hold: true` in the file skips a
+  # shop. A manual run can target specific shops (comma-separated names).
+  plan:
+    name: Plan shop deploys
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+    outputs:
+      ring0: ${{ steps.plan.outputs.ring0 }}
+      ring1: ${{ steps.plan.outputs.ring1 }}
     steps:
       - uses: actions/checkout@v4
+      - id: plan
+        env:
+          ONLY: ${{ github.event.inputs.shops }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          shops = json.load(open("shops/deploy.json"))["shops"]
+          only = {s.strip() for s in (os.environ.get("ONLY") or "").split(",") if s.strip()}
+          live = [s for s in shops if not s.get("hold") and (not only or s["name"] in only)]
+          for ring in (0, 1):
+              print(f"ring{ring}=" + json.dumps({"include": [s for s in live if s.get("ring", 1) == ring]}))
+          PY
+          cat "$GITHUB_OUTPUT"
 
+  deploy-canary:
+    name: Deploy ${{ matrix.name }} (ring 0)
+    needs: plan
+    if: fromJSON(needs.plan.outputs.ring0).include[0] != null
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.ring0) }}
+    steps:
+      - uses: actions/checkout@v4
       - name: Install Railway CLI
         run: npm install -g @railway/cli
-
       - name: Deploy
-        run: railway up --service "$RAILWAY_SERVICE_ID" --detach
+        # --ci streams the build and exits non-zero if it fails, so a broken
+        # build stops the rollout here instead of reaching the other shops.
+        run: railway up --service "$RAILWAY_SERVICE_ID" --ci
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_TOKEN: ${{ secrets[matrix.railway_token_secret] }}
+          RAILWAY_SERVICE_ID: ${{ secrets[matrix.railway_service_secret] }}
+      - name: Health check
+        if: matrix.url != ''
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf "${{ matrix.url }}/api/health" | grep -q '"ok":true' && exit 0
+            sleep 10
+          done
+          echo "::error::${{ matrix.name }} is not healthy after deploy"; exit 1
+
+  deploy:
+    name: Deploy ${{ matrix.name }} (ring 1)
+    needs: [plan, deploy-canary]
+    # Runs when the canary succeeded, or when there was no canary to run.
+    if: always() && needs.plan.result == 'success' && (needs.deploy-canary.result == 'success' || needs.deploy-canary.result == 'skipped') && fromJSON(needs.plan.outputs.ring1).include[0] != null
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.ring1) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy
+        run: railway up --service "$RAILWAY_SERVICE_ID" --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets[matrix.railway_token_secret] }}
+          RAILWAY_SERVICE_ID: ${{ secrets[matrix.railway_service_secret] }}
+      - name: Health check
+        if: matrix.url != ''
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf "${{ matrix.url }}/api/health" | grep -q '"ok":true' && exit 0
+            sleep 10
+          done
+          echo "::error::${{ matrix.name }} is not healthy after deploy"; exit 1

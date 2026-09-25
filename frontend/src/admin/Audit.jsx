@@ -11,6 +11,8 @@ const ACTIONS = {
   "admin.join": "Admin joined",
   "admin.demote": "Admin removed",
   "auth.password_reset": "Password reset",
+  "settings.update": "Settings changed",
+  "catalogue.import": "Catalogue import",
 };
 
 /** Read-only trail of who changed what: order statuses, prices, the team. */

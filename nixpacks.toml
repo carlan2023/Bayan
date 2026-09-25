@@ -1,3 +1,0 @@
-# Railway builds with Nixpacks; pin Node 22 for the built-in node:sqlite driver.
-[phases.setup]
-nixPkgs = ["nodejs_22"]

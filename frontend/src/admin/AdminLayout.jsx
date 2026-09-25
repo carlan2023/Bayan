@@ -1,6 +1,7 @@
 import { NavLink, Link, Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "../store";
 import Notifications from "./Notifications";
+import Wordmark from "../components/Wordmark";
 import "./admin.css";
 
 export default function AdminLayout() {
@@ -21,7 +22,7 @@ export default function AdminLayout() {
     <div className="admin-shell">
       <aside className="admin-side">
         <Link to="/" className="logo">
-          Ba<em>y</em>an
+          <Wordmark />
         </Link>
         <nav>
           <NavLink to="/admin" end>Overview</NavLink>
@@ -29,6 +30,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/orders">Orders</NavLink>
           <NavLink to="/admin/customers">Customers</NavLink>
           <NavLink to="/admin/storefront">Storefront</NavLink>
+          <NavLink to="/admin/settings">Settings</NavLink>
           <NavLink to="/admin/team">Team</NavLink>
           <NavLink to="/admin/audit">Audit log</NavLink>
           <NavLink to="/">← View store</NavLink>

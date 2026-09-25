@@ -70,6 +70,30 @@ export const api = {
     updateProduct: (id, body) => request(`/admin/products/${id}`, { method: "PUT", body }),
     deleteProduct: (id) => request(`/admin/products/${id}`, { method: "DELETE" }),
     customers: () => request("/admin/customers"),
+    settings: () => request("/admin/settings"),
+    saveSettings: (body) => request("/admin/settings", { method: "PUT", body }),
+    /** Catalogue import. dry=true only validates and reports. Resolves with the report even on 422. */
+    importCatalogue: async (file, { dry = false } = {}) => {
+      const body = new FormData();
+      body.append("file", file);
+      const token = getToken();
+      const res = await fetch(`${BASE}/admin/import${dry ? "?dry=1" : ""}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 422) throw new Error(data.error || `Import failed (${res.status})`);
+      return data; // { created, updated, errors, products, written }
+    },
+    importTemplate: async () => {
+      const token = getToken();
+      const res = await fetch(`${BASE}/admin/import/template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      return res.blob();
+    },
     team: () => request("/admin/team"),
     invite: (body) => request("/admin/invites", { method: "POST", body }),
     revokeInvite: (id) => request(`/admin/invites/${id}`, { method: "DELETE" }),
@@ -108,7 +132,5 @@ export const api = {
   },
 };
 
-export const fmtPrice = (cents) =>
-  new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX", maximumFractionDigits: 0 }).format(
-    cents / 100
-  );
+// Price formatting moved to the useMoney() hook in store.jsx: it reads the
+// shop's currency and locale from config, which a module function cannot.

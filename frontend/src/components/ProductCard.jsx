@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { fmtPrice } from "../api";
-import { useConfig, useWishlist } from "../store";
+import { useConfig, useMoney, useWishlist } from "../store";
 import ProductImage from "./ProductImage";
 import { HeartIcon, WhatsAppIcon } from "./Icons";
-import { waProductLink } from "../whatsapp";
+import { useWhatsApp } from "../whatsapp";
 
 export default function ProductCard({ product }) {
+  const money = useMoney();
+  const wa = useWhatsApp();
   const { has, toggle } = useWishlist();
   const { urgency_stock_threshold } = useConfig();
   const [error, setError] = useState("");
@@ -40,8 +41,8 @@ export default function ProductCard({ product }) {
           <div className="cat">{product.category}</div>
           <h3>{product.name}</h3>
           <div className="price">
-            {fmtPrice(product.price_cents)}
-            {product.compare_at_cents && <span className="was">{fmtPrice(product.compare_at_cents)}</span>}
+            {money(product.price_cents)}
+            {product.compare_at_cents && <span className="was">{money(product.compare_at_cents)}</span>}
           </div>
         </div>
       </Link>
@@ -58,10 +59,12 @@ export default function ProductCard({ product }) {
         <HeartIcon size={16} filled={wished} />
       </button>
 
-      {/* WhatsApp enquiry — a real link, also outside the card's Link. */}
+      {/* WhatsApp enquiry — a real link, also outside the card's Link. Hidden
+          when the shop has no WhatsApp number configured. */}
+      {wa.enabled && (
       <a
         className="wish-btn wa-btn"
-        href={waProductLink(product)}
+        href={wa.productLink(product)}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
@@ -70,6 +73,7 @@ export default function ProductCard({ product }) {
       >
         <WhatsAppIcon size={16} />
       </a>
+      )}
 
       <div className="swatches">
         {product.colors.map((c) => (

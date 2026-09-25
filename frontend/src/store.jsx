@@ -1,45 +1,132 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { api } from "./api";
+import { applyTheme, DEFAULT_SETTINGS } from "./theme";
 import { findVariant, priceOf } from "./variants";
 
 /* ---------------- Config ---------------- */
 /**
- * Delivery pricing lives on the server (backend/src/config.js) and is served at
- * GET /api/config. These defaults only cover the first paint and an offline
- * fetch; they must stay in step with the backend module.
+ * The shop's settings — brand, palette, fonts, copy, departments, currency and
+ * delivery pricing — served at GET /api/config from the Settings document.
+ *
+ * First paint never waits on that fetch: in production the server embeds the
+ * same payload in index.html (<script id="shop-config">, see
+ * backend/src/shell.js), so it is read synchronously here. Only the Vite dev
+ * server, which serves index.html untouched, falls back to the shared defaults
+ * (/shared/default-settings.json — the backend's own file) until the fetch
+ * lands. The server re-prices every order anyway, so a stale default can never
+ * be charged.
  */
-const DEFAULT_CONFIG = {
-  currency: "UGX",
-  free_delivery_threshold_cents: 20000000,
-  delivery_fee_cents: 1000000,
-  max_qty_per_line: 20,
+const FALLBACK_CONFIG = {
+  ...DEFAULT_SETTINGS,
   urgency_stock_threshold: 3,
   // Hides "Forgot password?" until the server says it can actually send the email.
   email_enabled: false,
 };
 
-const ConfigContext = createContext(DEFAULT_CONFIG);
+function embeddedConfig() {
+  try {
+    const el = typeof document !== "undefined" && document.getElementById("shop-config");
+    return el ? { ...FALLBACK_CONFIG, ...JSON.parse(el.textContent) } : null;
+  } catch {
+    return null;
+  }
+}
+
+const ConfigContext = createContext(FALLBACK_CONFIG);
+const ConfigActionsContext = createContext({ reload: async () => {}, replace: () => {} });
 
 export function ConfigProvider({ children }) {
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [config, setConfig] = useState(() => embeddedConfig() || FALLBACK_CONFIG);
 
+  const reload = useCallback(
+    () =>
+      api
+        .config()
+        .then((c) => setConfig({ ...FALLBACK_CONFIG, ...c }))
+        .catch(() => {
+          /* keep what we have — the server re-prices every order anyway */
+        }),
+    []
+  );
+
+  // Refresh even when embedded: a long-open tab should pick up edits.
   useEffect(() => {
-    api
-      .config()
-      .then((c) => setConfig({ ...DEFAULT_CONFIG, ...c }))
-      .catch(() => {
-        /* keep defaults — the server re-prices every order anyway */
-      });
-  }, []);
+    reload();
+  }, [reload]);
 
-  return <ConfigContext.Provider value={config}>{children}</ConfigContext.Provider>;
+  // Before paint, so a retheme never shows a frame of the old palette.
+  useLayoutEffect(() => {
+    applyTheme(config);
+    if (config.page_title) document.title = config.page_title;
+  }, [config]);
+
+  const actions = useMemo(
+    () => ({ reload, replace: (c) => setConfig({ ...FALLBACK_CONFIG, ...c }) }),
+    [reload]
+  );
+
+  return (
+    <ConfigActionsContext.Provider value={actions}>
+      <ConfigContext.Provider value={config}>{children}</ConfigContext.Provider>
+    </ConfigActionsContext.Provider>
+  );
 }
 export const useConfig = () => useContext(ConfigContext);
+/** { reload(), replace(config) } — used by Admin → Settings after a save. */
+export const useConfigActions = () => useContext(ConfigActionsContext);
 
 /** Delivery charge for a subtotal, using the server's thresholds. */
 export function useDelivery(subtotalCents) {
   const { free_delivery_threshold_cents, delivery_fee_cents } = useConfig();
   return subtotalCents >= free_delivery_threshold_cents ? 0 : delivery_fee_cents;
+}
+
+/**
+ * A money formatter for a currency + locale (prices are stored as cents).
+ * Whole amounts drop the minor units, so KES 200,000 isn't "Ksh 200,000.00",
+ * while a price with cents keeps them.
+ */
+export function moneyFormatter(currency, locale) {
+  let whole;
+  let exact;
+  try {
+    whole = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0, minimumFractionDigits: 0 });
+    exact = new Intl.NumberFormat(locale, { style: "currency", currency });
+  } catch {
+    whole = exact = new Intl.NumberFormat(undefined, { style: "currency", currency: "UGX", maximumFractionDigits: 0 });
+  }
+  return (cents) => {
+    const c = cents || 0;
+    return (c % 100 === 0 ? whole : exact).format(c / 100);
+  };
+}
+
+/**
+ * useMoney() → format(cents). Replaces the old module-level fmtPrice, which
+ * hard-coded en-UG / UGX and so could never follow a shop's settings.
+ */
+export function useMoney() {
+  const { currency, locale } = useConfig();
+  return useMemo(() => moneyFormatter(currency, locale), [currency, locale]);
+}
+
+/**
+ * useCopy() → t(text). Fills the placeholders the settings copy may use:
+ * {shop_name}, {free_delivery_threshold} and {delivery_fee} — so marketing copy
+ * quoting a fee stays true when the owner changes the fee.
+ */
+export function useCopy() {
+  const config = useConfig();
+  const money = useMoney();
+  return useCallback(
+    (text) =>
+      String(text ?? "").replace(/\{(shop_name|free_delivery_threshold|delivery_fee)\}/g, (_, key) =>
+        key === "shop_name"
+          ? config.shop_name
+          : money(key === "delivery_fee" ? config.delivery_fee_cents : config.free_delivery_threshold_cents)
+      ),
+    [config, money]
+  );
 }
 
 /* ---------------- Auth ---------------- */

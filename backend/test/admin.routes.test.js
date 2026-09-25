@@ -2,12 +2,14 @@ import { describe, test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 import { startHarness } from "./helpers/harness.js";
 
 /* Admin invites, team guards, price-edit auditing, uploads and headers. */
 const h = await startHarness();
 
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(56)]);
+// A real (decodable) PNG: uploads are re-encoded, so a header alone won't do.
+const PNG = await sharp({ create: { width: 40, height: 30, channels: 3, background: "#2e4b3f" } }).png().toBuffer();
 
 describe("admin team, audit and security", { skip: h.skip }, () => {
   let admin;
@@ -122,17 +124,18 @@ describe("admin team, audit and security", { skip: h.skip }, () => {
   test("uploads: extension comes from the bytes, never the name or mimetype", async () => {
     const ok = await upload(PNG, "photo.html", "image/png");
     assert.equal(ok.status, 201);
-    assert.match(ok.body.url, /^\/uploads\/\d+-[0-9a-f]{12}\.png$/);
+    // Re-encoded to WebP renditions whatever the upload was; the name is random.
+    assert.match(ok.body.url, /^\/uploads\/\d+-[0-9a-f]{12}\.webp$/);
 
     const evil = await upload(Buffer.from("<script>alert(1)</script>".padEnd(64)), "x.png", "image/png");
     assert.equal(evil.status, 400);
     const files = fs.readdirSync(process.env.UPLOAD_DIR).filter((f) => !f.startsWith("."));
-    assert.equal(files.length, 1, "the rejected file never reached /uploads");
+    assert.equal(files.length, 3, "one upload's three renditions; the rejected file never reached /uploads");
     assert.deepEqual(fs.readdirSync(path.join(process.env.UPLOAD_DIR, ".incoming")), [], "temp cleaned up");
 
     const served = await fetch(h.origin + ok.body.url);
     assert.equal(served.headers.get("x-content-type-options"), "nosniff");
-    assert.equal(served.headers.get("content-type"), "image/png");
+    assert.equal(served.headers.get("content-type"), "image/webp");
     const hidden = await fetch(`${h.origin}/uploads/.incoming/anything`);
     assert.equal(hidden.status, 404);
   });

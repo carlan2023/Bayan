@@ -1,17 +1,28 @@
-/**
- * WhatsApp click-to-chat links (wa.me). One place owns the number so a future
- * change is a one-line edit.
- */
-export const WHATSAPP_NUMBER = "256740399767"; // +256 740 399767, digits only per wa.me spec
+import { useConfig, useCopy } from "./store";
 
-export function waLink(message) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+/**
+ * WhatsApp click-to-chat links (wa.me). The number and the greeting come from
+ * the shop's settings (whatsapp_number, copy.whatsapp_greeting); a shop with
+ * no number configured gets `enabled: false`, and every WhatsApp control hides
+ * rather than linking to someone else's phone.
+ */
+export function waLink(number, message) {
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
-/** Prefilled enquiry for a specific product, linking back to its page. */
-export function waProductLink(product) {
-  const url = `${window.location.origin}/product/${product.slug}`;
-  return waLink(
-    `Hello Bayan! I'm interested in "${product.name}". Is it available?\n${url}`
-  );
+export function useWhatsApp() {
+  const { whatsapp_number, copy } = useConfig();
+  const t = useCopy();
+  const greeting = t(copy?.whatsapp_greeting || "Hello!");
+  const enabled = Boolean(whatsapp_number);
+  return {
+    enabled,
+    /** General enquiry. */
+    link: (message = `${greeting} I'd like to ask about your products.`) => waLink(whatsapp_number, message),
+    /** Prefilled enquiry for a specific product, linking back to its page. */
+    productLink: (product) => {
+      const url = `${window.location.origin}/product/${product.slug}`;
+      return waLink(whatsapp_number, `${greeting} I'm interested in "${product.name}". Is it available?\n${url}`);
+    },
+  };
 }

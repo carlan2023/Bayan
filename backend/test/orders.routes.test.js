@@ -1,7 +1,9 @@
 import { describe, test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { startHarness, orderBody } from "./helpers/harness.js";
-import { DELIVERY_FEE_CENTS } from "../src/config.js";
+import { DEFAULT_SETTINGS } from "../src/settings.js";
+
+const DELIVERY_FEE_CENTS = DEFAULT_SETTINGS.delivery_fee_cents;
 
 /*
  * Order creation and cancellation against a real MongoDB: the per-variant

@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { cssVar, isHex, shade } from "../theme";
+import { useConfig } from "../store";
+import { departmentIcon } from "./departments";
+import { srcSetFor } from "../imageSrc";
 
 /**
  * Renders the product's real photo (product.image) when present, falling back
@@ -6,35 +10,31 @@ import { useState } from "react";
  * image or the image fails to load. That fallback keeps the grid clean — no
  * broken-image icons — even when a seeded URL is unreachable.
  */
-const ICONS = {
-  Women: "M50 22c-6 0-10 5-10 11 0 4 2 7 4 9L30 78h40L56 42c2-2 4-5 4-9 0-6-4-11-10-11z",
-  Men: "M32 30l12-8h12l12 8 6 28h-10l-2 22H38l-2-22H26z",
-  Kids: "M50 20a9 9 0 100 18 9 9 0 000-18zM34 44l16-4 16 4 4 20h-8l-2 16H40l-2-16h-8z",
-  // Perfume bottle — the Accessories department (jewellery & fragrance).
-  Accessories: "M44 20h12v8h-12zM40 30h20a6 6 0 016 6v36a6 6 0 01-6 6H40a6 6 0 01-6-6V36a6 6 0 016-6zM42 44h16v10H42z",
-};
-
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = (v) => Math.max(0, Math.min(255, v + amt));
-  const r = c(n >> 16), g = c((n >> 8) & 0xff), b = c(n & 0xff);
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
-}
-
-export default function ProductImage({ product, ratio = 1.22 }) {
+/**
+ * @param sizes  how wide the image renders, for choosing a rendition. The
+ *               default suits the catalogue grid; the product page passes its own.
+ */
+export default function ProductImage({ product, ratio = 1.22, sizes = "(max-width: 600px) 50vw, (max-width: 1100px) 33vw, 280px" }) {
   const [failed, setFailed] = useState(false);
-  const base = product.swatch || "#2e4b3f";
+  const { departments, wordmark, shop_name } = useConfig();
+  // The gradient is product data (its swatch); only the fallback comes from the
+  // theme, read as a concrete colour because shade() needs real channels.
+  const base = isHex(product.swatch) ? product.swatch : cssVar("--pine", "#2e4b3f");
   const light = shade(base, 46);
   const dark = shade(base, -34);
-  const icon = ICONS[product.category] || ICONS.Accessories;
+  // Icon by the shop's own department list; unknown categories get a generic tag.
+  const icon = departmentIcon(departments, product.category);
   const gid = `g-${product.id || product.slug}`;
 
   if (product.image && !failed) {
     return (
       <img
         src={product.image}
+        srcSet={srcSetFor(product.image)}
+        sizes={sizes}
         alt={product.name}
         loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", aspectRatio: `1 / ${ratio}` }}
       />
@@ -55,10 +55,10 @@ export default function ProductImage({ product, ratio = 1.22 }) {
         </linearGradient>
       </defs>
       <rect width="100" height={100 * ratio} fill={`url(#${gid})`} />
-      <circle cx="82" cy="20" r="30" fill="#ffffff" opacity="0.08" />
-      <circle cx="12" cy={100 * ratio - 12} r="24" fill="#000000" opacity="0.08" />
+      <circle cx="82" cy="20" r="30" style={{ fill: "var(--surface)" }} opacity="0.08" />
+      <circle cx="12" cy={100 * ratio - 12} r="24" style={{ fill: "var(--ink)" }} opacity="0.08" />
       <g transform={`translate(0 ${(100 * ratio - 100) / 2})`}>
-        <path d={icon} fill="#fffdf7" opacity="0.85" />
+        <path d={icon} style={{ fill: "var(--surface)" }} opacity="0.85" />
       </g>
       <text
         x="50"
@@ -66,11 +66,10 @@ export default function ProductImage({ product, ratio = 1.22 }) {
         textAnchor="middle"
         fontSize="6"
         letterSpacing="2"
-        fill="#fffdf7"
         opacity="0.7"
-        style={{ fontFamily: "Outfit, sans-serif", textTransform: "uppercase" }}
+        style={{ fill: "var(--surface)", fontFamily: "var(--font-body)", textTransform: "uppercase" }}
       >
-        BAYAN
+        {wordmark || shop_name}
       </text>
     </svg>
   );

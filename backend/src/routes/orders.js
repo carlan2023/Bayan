@@ -2,13 +2,20 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { Product, Order, nextOrderNumber, notify } from "../db.js";
 import { optionalAuth, requireAuth } from "../auth.js";
-import { deliveryFor, MAX_QTY_PER_LINE, LOW_STOCK_THRESHOLD } from "../config.js";
+import { deliveryFor, getSettings, LOW_STOCK_THRESHOLD } from "../config.js";
 import { alertLowStock } from "../stock-alerts.js";
 import { clampQty, stockProblem, priceOrder } from "../pricing.js";
 import { resolveVariant, variantFilter, variantInc, variantLabel } from "../variants.js";
 import { restoreStock } from "../inventory.js";
 
-const fmtUGX = (cents) => `USh ${Math.round(cents / 100).toLocaleString("en-US")}`;
+/** The admin feed quotes totals in the shop's own currency, not a hard-coded one. */
+function fmtMoney(cents, { currency, locale }) {
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(cents / 100);
+  } catch {
+    return `${currency} ${Math.round(cents / 100).toLocaleString("en-US")}`;
+  }
+}
 
 const router = Router();
 
@@ -47,9 +54,13 @@ router.post("/", optionalAuth, async (req, res, next) => {
       return res.status(400).json({ error: "Cart contains an invalid product — please clear it and re-add items" });
     }
 
+    // One settings snapshot prices the whole order — the same source (and the
+    // same cache) GET /api/config quoted the shopper from.
+    const settings = await getSettings();
+
     const lines = [];
     for (const item of items) {
-      const qty = clampQty(item.qty, MAX_QTY_PER_LINE);
+      const qty = clampQty(item.qty, settings.max_qty_per_line);
       const product = await Product.findById(item.product_id);
       if (!product) return res.status(400).json({ error: `Product ${item.product_id} not found` });
       const { variant, error } = resolveVariant(product, item.size || null, item.color || null);
@@ -77,7 +88,7 @@ router.post("/", optionalAuth, async (req, res, next) => {
       l.stockAfter = updated.variants.find((v) => v.size === l.variant.size && v.color === l.variant.color)?.stock;
     }
 
-    const priced = priceOrder(lines, { deliveryFor });
+    const priced = priceOrder(lines, { deliveryFor: (subtotal) => deliveryFor(subtotal, settings) });
 
     const order = await Order.create({
       number: await nextOrderNumber(),
@@ -96,7 +107,7 @@ router.post("/", optionalAuth, async (req, res, next) => {
     const itemCount = lines.reduce((n, l) => n + l.qty, 0);
     notify(
       "order",
-      `New order #${order.number} — ${fmtUGX(order.total_cents)}`,
+      `New order #${order.number} — ${fmtMoney(order.total_cents, settings)}`,
       `${order.customer_name}, ${order.city} · ${itemCount} item${itemCount === 1 ? "" : "s"} · cash on delivery`,
       "/admin/orders"
     );

@@ -16,6 +16,7 @@ import AdminProducts from "./admin/Products";
 import AdminOrders from "./admin/Orders";
 import AdminCustomers from "./admin/Customers";
 import AdminStorefront from "./admin/Storefront";
+import AdminSettings from "./admin/Settings";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -67,6 +68,7 @@ export default function App() {
                   <Route path="orders" element={<AdminOrders />} />
                   <Route path="customers" element={<AdminCustomers />} />
                   <Route path="storefront" element={<AdminStorefront />} />
+                  <Route path="settings" element={<AdminSettings />} />
                   <Route path="team" element={<AdminTeam />} />
                   <Route path="audit" element={<AdminAudit />} />
                 </Route>

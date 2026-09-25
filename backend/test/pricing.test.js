@@ -1,12 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { clampQty, stockProblem, priceOrder } from "../src/pricing.js";
-import {
-  deliveryFor,
-  FREE_DELIVERY_THRESHOLD_CENTS,
-  DELIVERY_FEE_CENTS,
-  MAX_QTY_PER_LINE,
-} from "../src/config.js";
+import { deliveryFor as deliveryForSettings } from "../src/config.js";
+import { DEFAULT_SETTINGS } from "../src/settings.js";
+
+// Commerce rules are per-shop settings now; these tests price with the defaults.
+const {
+  free_delivery_threshold_cents: FREE_DELIVERY_THRESHOLD_CENTS,
+  delivery_fee_cents: DELIVERY_FEE_CENTS,
+  max_qty_per_line: MAX_QTY_PER_LINE,
+} = DEFAULT_SETTINGS;
+const deliveryFor = (subtotal) => deliveryForSettings(subtotal, DEFAULT_SETTINGS);
 
 /*
  * The order money path: what a customer is actually charged. Every figure here

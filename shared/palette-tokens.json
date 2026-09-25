@@ -1,0 +1,14 @@
+{
+  "bg": "--bg",
+  "surface": "--surface",
+  "ink": "--ink",
+  "ink_soft": "--ink-soft",
+  "primary": "--pine",
+  "primary_dark": "--pine-dark",
+  "primary_tint": "--pine-tint",
+  "accent": "--clay",
+  "accent_dark": "--clay-dark",
+  "highlight": "--gold",
+  "line": "--line",
+  "danger": "--danger"
+}

@@ -1,4 +1,33 @@
-/* ============ Bayan admin dashboard ============ */
+/* ============ Admin dashboard ============ */
+
+/* Admin tokens. Everything is expressed in terms of the storefront palette
+   (styles.css :root), so a shop's retheme reaches the dashboard too. Charts
+   and the status donut read --chart-* / --status-* through CSS, not JS
+   constants — see Charts.jsx and Dashboard.jsx. */
+.admin-shell {
+  --admin-side-bg: var(--pine-dark);
+  --admin-side-ink: var(--on-dark-soft);
+  --admin-side-ink-strong: var(--on-dark);
+  --admin-side-ink-muted: var(--on-dark-muted);
+  --admin-side-hover: rgba(255, 255, 255, 0.06);
+  --admin-side-rule: rgba(255, 255, 255, 0.12);
+
+  --chart-1: var(--pine);
+  --chart-2: var(--clay);
+  --chart-3: var(--gold);
+  --chart-4: var(--info);
+  --chart-5: var(--ink-soft);
+  --chart-6: var(--clay-dark);
+  --chart-empty: var(--line);
+  --chart-track: var(--bg);
+  --chart-label: var(--ink-soft);
+
+  --status-pending: var(--gold);
+  --status-confirmed: var(--info);
+  --status-dispatched: var(--violet);
+  --status-delivered: var(--pine);
+  --status-cancelled: var(--danger);
+}
 
 .admin-shell { display: flex; min-height: 100vh; background: var(--bg); }
 
@@ -6,8 +35,8 @@
 .admin-side {
   width: 232px;
   flex-shrink: 0;
-  background: var(--pine-dark);
-  color: #d9d3c2;
+  background: var(--admin-side-bg);
+  color: var(--admin-side-ink);
   display: flex;
   flex-direction: column;
   padding: 24px 16px;
@@ -15,7 +44,7 @@
   top: 0;
   height: 100vh;
 }
-.admin-side .logo { color: #f3eee0; font-size: 1.5rem; padding: 0 10px 20px; }
+.admin-side .logo { color: var(--admin-side-ink-strong); font-size: 1.5rem; padding: 0 10px 20px; }
 .admin-side nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .admin-side nav a {
   display: flex;
@@ -24,13 +53,13 @@
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.92rem;
-  color: #c5bfab;
+  color: var(--admin-side-ink-muted);
   transition: background 0.12s, color 0.12s;
 }
-.admin-side nav a:hover { background: rgba(255, 255, 255, 0.06); color: #f3eee0; }
-.admin-side nav a.active { background: var(--clay); color: #fff; }
-.admin-side .side-foot { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px; font-size: 0.85rem; }
-.admin-side .side-foot .who { color: #f3eee0; font-weight: 500; }
+.admin-side nav a:hover { background: var(--admin-side-hover); color: var(--admin-side-ink-strong); }
+.admin-side nav a.active { background: var(--clay); color: var(--on-accent); }
+.admin-side .side-foot { border-top: 1px solid var(--admin-side-rule); padding-top: 14px; font-size: 0.85rem; }
+.admin-side .side-foot .who { color: var(--admin-side-ink-strong); font-weight: 500; }
 .admin-side .side-foot button { background: none; border: none; color: var(--gold); padding: 4px 0; font-size: 0.85rem; }
 
 /* Main area */
@@ -87,15 +116,15 @@
 .admin-table tr:last-child td { border-bottom: none; }
 .admin-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .admin-table .prod-cell { display: flex; align-items: center; gap: 10px; }
-.mini-swatch { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; border: 1px solid rgba(31,42,36,0.15); }
+.mini-swatch { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; border: 1px solid var(--ink-hairline-soft); }
 
 /* Status chips */
 .chip { display: inline-block; border-radius: 999px; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 10px; }
-.chip.pending    { background: #f0e3c0; color: #7a5d18; }
-.chip.confirmed  { background: #dbe7f0; color: #2b5573; }
-.chip.dispatched { background: #e4d9f0; color: #5b3f7e; }
+.chip.pending    { background: var(--warn-tint); color: var(--warn-ink); }
+.chip.confirmed  { background: var(--info-tint); color: var(--info-ink); }
+.chip.dispatched { background: var(--violet-tint); color: var(--violet-ink); }
 .chip.delivered  { background: var(--pine-tint); color: var(--pine-dark); }
-.chip.cancelled  { background: #f2dcd7; color: var(--danger); }
+.chip.cancelled  { background: var(--danger-tint-strong); color: var(--danger); }
 
 /* Small controls */
 .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -108,7 +137,7 @@
 }
 .btn-sm { padding: 8px 16px; font-size: 0.75rem; }
 .btn-danger { background: transparent; color: var(--danger); border: 1.5px solid var(--danger); }
-.btn-danger:hover { background: #f6e4df; }
+.btn-danger:hover { background: var(--danger-tint); }
 
 /* Product form */
 .drawer {
@@ -191,6 +220,36 @@
   .admin-main { padding: 20px; }
 }
 
+/* ---- Settings ---- */
+.form-2col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 900px) { .form-2col { grid-template-columns: 1fr; } }
+.settings-section { margin-bottom: 20px; }
+.settings-section .hint { display: block; margin-top: 4px; }
+.logo-preview { height: 40px; max-width: 160px; object-fit: contain; }
+.settings-theme { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .settings-theme { grid-template-columns: 1fr; } }
+.palette-grid { display: grid; gap: 8px; }
+.palette-row { display: flex; align-items: center; gap: 10px; }
+.palette-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); }
+.dept-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.dept-row .input-sm:first-of-type { flex: 1; min-width: 140px; }
+.dept-icon { width: 36px; height: 36px; border-radius: 8px; flex: none; }
+.perk-edit { display: grid; gap: 8px; }
+
+/* The preview wears the draft palette: applyTheme() writes the tokens onto it. */
+.theme-preview { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-body); }
+.tp-top { background: var(--pine-dark); color: var(--on-dark); font-size: 0.75rem; padding: 6px 12px; min-height: 26px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tp-body { padding: 16px; }
+.tp-logo { font-family: var(--font-display); font-size: 1.5rem; color: var(--pine); margin-bottom: 12px; }
+.tp-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px; }
+.tp-card p { color: var(--ink-soft); font-size: 0.9rem; margin: 6px 0 12px; }
+.tp-eyebrow { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay-dark); }
+.tp-head { font-family: var(--font-display); font-size: 1.3rem; }
+.tp-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tp-btn { padding: 7px 14px; border-radius: 999px; font-size: 0.8rem; }
+.tp-btn.primary { background: var(--pine); color: var(--on-primary); }
+.tp-btn.accent { background: var(--clay); color: var(--on-accent); }
+.tp-badge { background: var(--danger); color: var(--on-accent); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; }
 /* ---- Product form: previews and the per-variant stock table ---- */
 .thumb-preview { width: 64px; height: 78px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: inline-block; flex: none; }
 .thumb-preview.sm { width: 48px; height: 58px; }
@@ -202,3 +261,7 @@
 .variant-table tr.variant-out td:first-child,
 .variant-table tr.variant-out td:nth-child(2) { color: var(--danger); }
 .invite-link { word-break: break-all; font-size: 0.82rem; }
+.import-errors { margin: 8px 0 0 18px; font-size: 0.85rem; max-height: 240px; overflow: auto; }
+.import-preview { max-height: 320px; overflow: auto; margin-bottom: 12px; }
+.settings-page input[type="color"] { width: 44px; height: 34px; padding: 2px; flex: none; cursor: pointer; }
+.settings-page .palette-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); }

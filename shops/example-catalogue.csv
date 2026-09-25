@@ -1,0 +1,11 @@
+handle,name,category,description,price,compare_at_price,fabric,featured,image,size,color,color_hex,color_image,sku,stock,variant_price
+merino-crew,Merino Crew Jumper,Men,"A fine-gauge merino crew that layers under a jacket.",6500,7500,Merino wool,yes,https://images.unsplash.com/photo-1614975059251-992f11792b9f?auto=format&fit=crop&w=800&q=70,M,Moss,#4e5d4a,,,5,
+merino-crew,,,,,,,,,L,Moss,,,,3,
+merino-crew,,,,,,,,,M,Oat,#cfc4ac,,,4,
+merino-crew,,,,,,,,,L,Oat,,,,0,
+wrap-dress,Linen Wrap Dress,Women,"A breezy wrap silhouette in washed linen.",5900,,100% linen,,https://images.unsplash.com/photo-1596783074918-c84cb06531ca?auto=format&fit=crop&w=800&q=70,S,Forest,#2e4b3f,,,2,
+wrap-dress,,,,,,,,,M,Forest,,,,6,
+wrap-dress,,,,,,,,,L,Forest,,,,4,6200
+canvas-sneaker,Canvas Sneaker,Shoes,"Vulcanised canvas sneakers with a cushioned insole.",4200,,Cotton canvas,,https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=70,40,Chalk,#efece4,,,3,
+canvas-sneaker,,,,,,,,,41,Chalk,,,,5,
+canvas-sneaker,,,,,,,,,42,Chalk,,,,5,

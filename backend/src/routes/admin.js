@@ -6,7 +6,8 @@ import crypto from "crypto";
 import multer from "multer";
 import { User, Product, Order, Notification, Setting, ORDER_STATUSES, notify } from "../db.js";
 import { requireAuth, issuedBeforePasswordChange } from "../auth.js";
-import { claimsImage, claimsHeroMedia, finaliseUpload } from "../uploads.js";
+import { claimsImage, claimsHeroMedia } from "../uploads.js";
+import { publishUpload, getStore, uploadDir } from "../storage.js";
 import { slugify, validateProduct, productFields, variantFields } from "../product-fields.js";
 import { LOW_STOCK_THRESHOLD } from "../config.js";
 import { variantLabel } from "../variants.js";
@@ -17,13 +18,14 @@ import { sendEmail, appUrl, emailEnabled, escapeHtml } from "../mailer.js";
 
 const router = Router();
 
-// Where uploaded product images are written. In production this is a Railway
-// volume mount (UPLOAD_DIR=/data/uploads) so files survive redeploys; locally it
-// falls back to backend/uploads. server.js serves this directory at /uploads.
-export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve("uploads");
+// Local upload directory: where the local storage driver publishes files (and
+// server.js serves them at /uploads), and where every upload is staged before
+// it is vouched for. In production this is a Railway volume
+// (UPLOAD_DIR=/data/uploads) unless S3/R2 is configured — see src/storage.js.
+export const UPLOAD_DIR = uploadDir();
 // Unverified uploads land here first. express.static ignores dot-directories,
-// so nothing in it is ever served; finaliseUpload() sniffs each file and
-// renames it into UPLOAD_DIR (same filesystem, so the move is atomic).
+// so nothing in it is ever served; publishUpload() sniffs each file, resizes
+// images and only then publishes them.
 const INCOMING_DIR = path.join(UPLOAD_DIR, ".incoming");
 fs.mkdirSync(INCOMING_DIR, { recursive: true });
 
@@ -57,8 +59,10 @@ const heroUpload = multer({
  * Admin gate: valid JWT + is_admin re-checked against the DB on every request,
  * and the session must post-date the account's last password reset — so
  * resetting a leaked admin password immediately locks out the old token.
+ * Exported for the admin sub-routers mounted separately in server.js
+ * (settings, catalogue import).
  */
-function requireAdmin(req, res, next) {
+export function requireAdmin(req, res, next) {
   requireAuth(req, res, async () => {
     try {
       const u = await User.findById(req.user.id).select("is_admin email password_changed_at");
@@ -107,7 +111,7 @@ function handleUpload(middleware, kinds, respond) {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       try {
-        const stored = await finaliseUpload(req.file.path, UPLOAD_DIR, kinds);
+        const stored = await publishUpload(req.file.path, kinds);
         res.status(201).json(respond(stored));
       } catch (e) {
         if (e.status === 400) return res.status(400).json({ error: e.message });
@@ -119,10 +123,7 @@ function handleUpload(middleware, kinds, respond) {
 
 router.post(
   "/hero/upload",
-  handleUpload(heroUpload.single("file"), ["image", "video"], (f) => ({
-    url: `/uploads/${f.filename}`,
-    media_type: f.kind,
-  }))
+  handleUpload(heroUpload.single("file"), ["image", "video"], (f) => ({ url: f.url, media_type: f.kind }))
 );
 
 router.put("/hero", async (req, res, next) => {
@@ -136,7 +137,8 @@ router.put("/hero", async (req, res, next) => {
     }
     // Only media we host ourselves — an arbitrary URL here would let a stolen
     // admin token point the homepage at any external content.
-    if (typeof url !== "string" || !url.startsWith("/uploads/")) {
+    // Local /uploads files stay valid after a move to S3/R2 (they are still served).
+    if (typeof url !== "string" || !(url.startsWith("/uploads/") || (await getStore()).owns(url))) {
       return res.status(400).json({ error: "Hero media must be an uploaded file" });
     }
     if (!["image", "video"].includes(media_type)) {
@@ -579,7 +581,7 @@ router.delete("/products/:id", async (req, res, next) => {
 
 router.post(
   "/uploads",
-  handleUpload(upload.single("file"), ["image"], (f) => ({ url: `/uploads/${f.filename}` }))
+  handleUpload(upload.single("file"), ["image"], (f) => ({ url: f.url }))
 );
 
 /* ================= Customers ================= */

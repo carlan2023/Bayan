@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useAuth, useCart, useDelivery } from "../store";
+import { api } from "../api";
+import { useAuth, useCart, useDelivery, useMoney } from "../store";
 import CartNotice from "../components/CartNotice";
 
 export default function Checkout() {
+  const money = useMoney();
   const { items, subtotal, clear, revalidate } = useCart();
   const { user } = useAuth();
   const delivery = useDelivery(subtotal);
@@ -34,7 +35,7 @@ export default function Checkout() {
       <div className="container empty">
         <h2>Thank you, {order.customer_name.split(" ")[0]}!</h2>
         <p style={{ maxWidth: 480, margin: "0 auto 8px" }}>
-          Order <strong>#{order.number}</strong> is confirmed for <strong>{fmtPrice(order.total_cents)}</strong>.
+          Order <strong>#{order.number}</strong> is confirmed for <strong>{money(order.total_cents)}</strong>.
         </p>
         <p style={{ maxWidth: 480, margin: "0 auto 24px" }}>
           Please have the cash ready when our courier arrives at {order.address}, {order.city}.
@@ -178,12 +179,12 @@ export default function Checkout() {
           </div>
 
           <div className="cod-note">
-            <strong>Cash on delivery.</strong> You pay {fmtPrice(subtotal + delivery)} in cash when the
+            <strong>Cash on delivery.</strong> You pay {money(subtotal + delivery)} in cash when the
             courier hands over your order. Orders are confirmed by phone before dispatch.
           </div>
 
           <button className="btn btn-accent btn-block" disabled={placing}>
-            {placing ? "Placing order…" : `Place order — ${fmtPrice(subtotal + delivery)}`}
+            {placing ? "Placing order…" : `Place order — ${money(subtotal + delivery)}`}
           </button>
         </form>
 
@@ -198,16 +199,16 @@ export default function Checkout() {
                   ({i.size}, {i.color})
                 </span>
               </span>
-              <span>{fmtPrice(i.price_cents * i.qty)}</span>
+              <span>{money(i.price_cents * i.qty)}</span>
             </div>
           ))}
           <div className="summary-line">
             <span>Delivery</span>
-            <span>{delivery === 0 ? "Free" : fmtPrice(delivery)}</span>
+            <span>{delivery === 0 ? "Free" : money(delivery)}</span>
           </div>
           <div className="summary-line total">
             <span>Total due on delivery</span>
-            <span>{fmtPrice(subtotal + delivery)}</span>
+            <span>{money(subtotal + delivery)}</span>
           </div>
         </div>
       </div>

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { fmtPrice } from "../api";
-import { useCart, useDelivery } from "../store";
+import { useCart, useDelivery, useMoney } from "../store";
 import ProductImage from "../components/ProductImage";
 import CartNotice from "../components/CartNotice";
 
 export default function Cart() {
+  const money = useMoney();
   const { items, subtotal, setQty, remove, keyOf, revalidate, maxQty } = useCart();
   const delivery = useDelivery(subtotal);
   const [changes, setChanges] = useState([]);
@@ -47,7 +47,7 @@ export default function Cart() {
             return (
               <div className="cart-row" key={k}>
                 <Link to={`/product/${i.slug}`} className="thumb">
-                  <ProductImage product={i} ratio={1} />
+                  <ProductImage product={i} ratio={1} sizes="96px" />
                 </Link>
                 <div>
                   <Link to={`/product/${i.slug}`}>
@@ -73,7 +73,7 @@ export default function Cart() {
                     +
                   </button>
                 </div>
-                <div className="price">{fmtPrice(i.price_cents * i.qty)}</div>
+                <div className="price">{money(i.price_cents * i.qty)}</div>
               </div>
             );
           })}
@@ -82,15 +82,15 @@ export default function Cart() {
           <h3 style={{ marginBottom: 12 }}>Summary</h3>
           <div className="summary-line">
             <span>Subtotal</span>
-            <span>{fmtPrice(subtotal)}</span>
+            <span>{money(subtotal)}</span>
           </div>
           <div className="summary-line">
             <span>Delivery</span>
-            <span>{delivery === 0 ? "Free" : fmtPrice(delivery)}</span>
+            <span>{delivery === 0 ? "Free" : money(delivery)}</span>
           </div>
           <div className="summary-line total">
             <span>Total</span>
-            <span>{fmtPrice(subtotal + delivery)}</span>
+            <span>{money(subtotal + delivery)}</span>
           </div>
           <div className="cod-note">Pay in cash when your order arrives — no card needed.</div>
           <Link to="/checkout" className="btn btn-accent btn-block" style={{ textAlign: "center" }}>

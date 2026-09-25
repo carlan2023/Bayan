@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { api } from "../api";
 import { compressImage } from "../imageCompress";
+import { cssVar } from "../theme";
 import VariantEditor, { variantsToForm, variantsToPayload } from "./VariantEditor";
 
-const CATEGORIES = ["Women", "Men", "Kids", "Accessories"];
-
-export const emptyForm = () => ({
+/**
+ * A blank form. The category defaults to the shop's first department, and the
+ * colour pickers start on the shop's primary colour: <input type="color">
+ * needs a concrete hex, so the token is read when the form opens (after any
+ * runtime retheme) rather than baked in.
+ */
+export const emptyForm = (departments = []) => ({
   name: "",
-  category: "Women",
+  category: departments[0]?.name || "",
   price: "",
   compare_at: "",
   description: "",
   fabric: "",
-  swatch: "#2e4b3f",
+  swatch: cssVar("--pine", "#2e4b3f"),
   image: "",
-  colors: [{ name: "", hex: "#2e4b3f", image: "" }],
+  colors: [{ name: "", hex: cssVar("--pine", "#2e4b3f"), image: "" }],
   sizes: "XS, S, M, L, XL",
   variants: {},
   featured: false,
@@ -64,7 +69,7 @@ function toPayload(f) {
 }
 
 /** Create/edit drawer for one product. `initial` is a form object from emptyForm()/toForm(). */
-export default function ProductForm({ initial, editingId, onSaved, onCancel, currency = "UGX" }) {
+export default function ProductForm({ initial, editingId, onSaved, onCancel, currency = "UGX", categories = [] }) {
   const [form, setForm] = useState(initial);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -144,11 +149,20 @@ export default function ProductForm({ initial, editingId, onSaved, onCancel, cur
         </div>
         <div>
           <label htmlFor="p-category">Category *</label>
-          <select id="p-category" value={form.category} onChange={set("category")}>
-            {[...new Set([...CATEGORIES, form.category])].map((c) => (
-              <option key={c}>{c}</option>
+          {/* The shop's departments, plus whatever this product already uses
+              (a category from an import that isn't a department yet). */}
+          <input
+            id="p-category"
+            required
+            list="p-category-options"
+            value={form.category}
+            onChange={set("category")}
+          />
+          <datalist id="p-category-options">
+            {[...new Set([...categories, form.category].filter(Boolean))].map((c) => (
+              <option key={c} value={c} />
             ))}
-          </select>
+          </datalist>
         </div>
         <div>
           <label htmlFor="p-fabric">Fabric / material</label>
@@ -296,7 +310,7 @@ export default function ProductForm({ initial, editingId, onSaved, onCancel, cur
         <button
           type="button"
           className="link-btn"
-          onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: f.swatch, image: "" }] }))}
+          onClick={() => setForm((f) => ({ ...f, colors: [...f.colors, { name: "", hex: cssVar("--clay", f.swatch), image: "" }] }))}
         >
           + Add colour
         </button>

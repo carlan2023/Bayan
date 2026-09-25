@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, fmtPrice } from "../api";
-import { useCart, useConfig, useWishlist } from "../store";
+import { api } from "../api";
+import { useCart, useConfig, useMoney, useWishlist } from "../store";
 import { useAsync } from "../useAsync";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
 import { HeartIcon, CheckIcon, WhatsAppIcon } from "../components/Icons";
-import { waProductLink } from "../whatsapp";
+import { useWhatsApp } from "../whatsapp";
 import { findVariant, colorAvailable, priceOf } from "../variants";
 
 export default function Product() {
+  const money = useMoney();
+  const wa = useWhatsApp();
   const { slug } = useParams();
   const { add } = useCart();
   const { has, toggle } = useWishlist();
@@ -99,14 +101,14 @@ export default function Product() {
     <div className="container">
       <div className="pdp">
         <div className="pdp-img">
-          <ProductImage product={heroProduct} ratio={1.1} />
+          <ProductImage product={heroProduct} ratio={1.1} sizes="(max-width: 900px) 100vw, 560px" />
         </div>
         <div className="pdp-info">
           <div className="cat">{product.category}</div>
           <h1>{product.name}</h1>
           <div className="price">
-            {fmtPrice(unitPrice)}
-            {product.compare_at_cents && <span className="was">{fmtPrice(product.compare_at_cents)}</span>}
+            {money(unitPrice)}
+            {product.compare_at_cents && <span className="was">{money(product.compare_at_cents)}</span>}
           </div>
           {lowStock && (
             <div className="stock-alert" role="status">
@@ -185,14 +187,16 @@ export default function Product() {
             >
               {wished ? "Saved" : "Wishlist"} <HeartIcon size={16} filled={wished} />
             </button>
-            <a
-              className="btn btn-wa btn-icon"
-              href={waProductLink(product)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Ask on WhatsApp <WhatsAppIcon size={16} />
-            </a>
+            {wa.enabled && (
+              <a
+                className="btn btn-wa btn-icon"
+                href={wa.productLink(product)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ask on WhatsApp <WhatsAppIcon size={16} />
+              </a>
+            )}
           </div>
 
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
@@ -205,7 +209,7 @@ export default function Product() {
                   ? "In stock"
                   : `Only ${available} left`}{" "}
             ·
-            Cash on delivery available · Free delivery over {fmtPrice(free_delivery_threshold_cents)}
+            Cash on delivery available · Free delivery over {money(free_delivery_threshold_cents)}
           </div>
         </div>
       </div>
