@@ -121,6 +121,9 @@ app.use(
 // Express's default HTML 404, which the client then failed to parse, surfacing
 // a confusing "Request failed (404)" instead of the real problem.
 app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint not found" }));
+// A missing upload (including anything under the unserved .incoming/ dir) is a
+// plain 404, never the SPA's index.html served with a 200 as if it were the image.
+app.use("/uploads", (_req, res) => res.status(404).type("text/plain").send("Not found"));
 
 // In production (e.g. Railway) serve the built frontend from the same service,
 // so the SPA and API share one origin and no CORS/proxy config is needed.

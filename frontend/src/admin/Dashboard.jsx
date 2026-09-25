@@ -148,18 +148,18 @@ export default function Dashboard() {
         <div className="admin-panel">
           <h3>Low stock <span>— 10 or fewer left</span></h3>
           {low_stock.length === 0 ? (
-            <div className="empty-mini">All products are well stocked.</div>
+            <div className="empty-mini">Every size and colour is well stocked.</div>
           ) : (
             <div className="table-scroll">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Product</th><th>Category</th><th className="num">Stock</th></tr>
+                  <tr><th>Product</th><th>Variant</th><th className="num">Stock</th></tr>
                 </thead>
                 <tbody>
                   {low_stock.map((p) => (
-                    <tr key={p.id}>
+                    <tr key={`${p.id}|${p.variant}`}>
                       <td>{p.name}</td>
-                      <td>{p.category}</td>
+                      <td>{p.variant || "—"}{p.sku && <span className="muted-sku"> · {p.sku}</span>}</td>
                       <td className="num" style={{ color: p.stock === 0 ? "var(--danger)" : "inherit" }}>{p.stock}</td>
                     </tr>
                   ))}

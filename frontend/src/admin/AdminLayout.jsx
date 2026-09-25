@@ -29,6 +29,8 @@ export default function AdminLayout() {
           <NavLink to="/admin/orders">Orders</NavLink>
           <NavLink to="/admin/customers">Customers</NavLink>
           <NavLink to="/admin/storefront">Storefront</NavLink>
+          <NavLink to="/admin/team">Team</NavLink>
+          <NavLink to="/admin/audit">Audit log</NavLink>
           <NavLink to="/">← View store</NavLink>
         </nav>
         <Notifications variant="sidebar" />

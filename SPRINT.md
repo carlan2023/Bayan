@@ -61,12 +61,14 @@ Works at 24 products; breaks quietly as the catalogue grows.
 
 **Not verified visually** — same as the previous two batches.
 
-## Milestone 5 — Security & release hygiene
+## Milestone 5 — Security & release hygiene ✅
 
 Nothing exotic, but this is a live deployment taking customer addresses and phone numbers.
 
-- [ ] **No rate limiting on `/api/auth/login`** (`routes/auth.js:39`) — unlimited brute force, and a CPU-exhaustion vector since `bcrypt.compareSync` blocks the single-threaded event loop. Add `express-rate-limit`, switch to async `bcrypt.compare`.
-- [ ] **`cors()` is fully open** (`server.js:16`) even though the frontend is served same-origin in production. Restrict it, add `helmet`.
-- [ ] **Upload extension is attacker-controlled.** `admin.js:21` takes the extension from `file.originalname`; the `fileFilter` only checks the client-supplied mimetype. A file named `x.html` sent as `image/png` is written and served as `text/html` from `/uploads` (`server.js:27`) — stored XSS on your own origin. Admin-only, so low severity. Allowlist `.jpg/.jpeg/.png/.webp`, set `X-Content-Type-Options`.
-- [ ] **`multer@1.4.5-lts.1`** is EOL with known DoS advisories; upgrade to `2.x`.
-- [ ] **No test suite.** CI (`.github/workflows/ci-cd.yml`) is a curl smoke test with `sleep 3` and no assertions on money math. The order-pricing path deserves real unit tests.
+- [x] **No rate limiting on `/api/auth/login`** (`routes/auth.js:39`) — unlimited brute force, and a CPU-exhaustion vector since `bcrypt.compareSync` blocks the single-threaded event loop. Add `express-rate-limit`, switch to async `bcrypt.compare`.
+- [x] **`cors()` is fully open** (`server.js:16`) even though the frontend is served same-origin in production. Restrict it, add `helmet`.
+- [x] **Upload extension is attacker-controlled.** `admin.js:21` takes the extension from `file.originalname`; the `fileFilter` only checks the client-supplied mimetype. A file named `x.html` sent as `image/png` is written and served as `text/html` from `/uploads` (`server.js:27`) — stored XSS on your own origin. Admin-only, so low severity. Allowlist `.jpg/.jpeg/.png/.webp`, set `X-Content-Type-Options`.
+- [x] **`multer@1.4.5-lts.1`** is EOL with known DoS advisories; upgrade to `2.x`.
+- [x] **No test suite.** CI (`.github/workflows/ci-cd.yml`) is a curl smoke test with `sleep 3` and no assertions on money math. The order-pricing path deserves real unit tests.
+
+**Done** (tracked in detail as `SCALING.md` M9): per-IP rate limits on login/register/forgot/reset/invite with async bcrypt; CORS off in production unless `CORS_ORIGIN` is set; helmet with a CSP; uploads sniffed by magic number into an unserved temp dir, stored under a random name with an allowlisted extension and served with `nosniff`; multer 2.x; `npm test` with unit tests on the money math (`test/pricing.test.js`) and route tests against a real MongoDB, run in CI. *Found while verifying:* with the frontend built, a missing `/uploads/...` file fell through to the SPA and came back as `index.html` with a 200. It is now a plain 404.

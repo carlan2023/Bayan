@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api } from "./api";
+import { findVariant, priceOf } from "./variants";
 
 /* ---------------- Config ---------------- */
 /**
@@ -13,6 +14,8 @@ const DEFAULT_CONFIG = {
   delivery_fee_cents: 1000000,
   max_qty_per_line: 20,
   urgency_stock_threshold: 3,
+  // Hides "Forgot password?" until the server says it can actually send the email.
+  email_enabled: false,
 };
 
 const ConfigContext = createContext(DEFAULT_CONFIG);
@@ -78,6 +81,8 @@ export function AuthProvider({ children }) {
       const { token, user } = await api.register({ name, email, password });
       persist(token, user);
     },
+    /** Store a session the server already issued (password reset, invite acceptance). */
+    signIn: persist,
     logout: logoutInternal,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -184,12 +189,17 @@ export function CartProvider({ children }) {
         continue;
       }
 
-      const line = { ...item, name: p.name, slug: p.slug, price_cents: p.price_cents, stock: p.stock };
-      if (p.price_cents !== item.price_cents) {
-        changes.push({ kind: "price", name: p.name, from: item.price_cents, to: p.price_cents });
+      // Stock and price are per size/colour: a line for a pair the product no
+      // longer makes counts as sold out, whatever the other sizes hold.
+      const variant = findVariant(p, item.size, item.color);
+      const price = priceOf(p, item.size, item.color);
+      const stock = variant ? variant.stock : 0;
+      const line = { ...item, name: p.name, slug: p.slug, price_cents: price, stock };
+      if (price !== item.price_cents) {
+        changes.push({ kind: "price", name: p.name, from: item.price_cents, to: price });
       }
 
-      const cap = Math.min(p.stock, max_qty_per_line);
+      const cap = Math.min(stock, max_qty_per_line);
       if (cap <= 0) {
         changes.push({ kind: "soldout", name: p.name });
         continue;
@@ -214,15 +224,18 @@ export function CartProvider({ children }) {
     add(product, { size, color, qty = 1 }) {
       setItems((prev) => {
         const colorImage = product.colors?.find((c) => c.name === color)?.image;
+        const variant = findVariant(product, size, color);
         const entry = {
           product_id: product.id,
           slug: product.slug,
           name: product.name,
-          price_cents: product.price_cents,
+          price_cents: priceOf(product, size, color),
           swatch: product.swatch,
           category: product.category,
           image: colorImage || product.image || null,
-          stock: product.stock,
+          // The chosen pair's stock, not the product total: "3 left in L" must
+          // stop the + button at 3 even when XS has forty.
+          stock: variant ? variant.stock : 0,
           size,
           color,
           qty,
@@ -230,7 +243,7 @@ export function CartProvider({ children }) {
         const k = keyOf(entry);
         // Never let a line exceed stock or the server's per-line cap — the
         // order endpoint silently clamps, which would surprise the shopper.
-        const cap = Math.min(product.stock ?? max_qty_per_line, max_qty_per_line);
+        const cap = Math.min(entry.stock, max_qty_per_line);
         if (cap <= 0) return prev; // sold out — adding it would only fail at checkout
         const existing = prev.find((i) => keyOf(i) === k);
         if (existing) {

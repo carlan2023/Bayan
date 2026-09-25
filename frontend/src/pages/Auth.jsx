@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../store";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth, useConfig } from "../store";
 
 export default function Auth() {
   const { login, register } = useAuth();
+  const { email_enabled } = useConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState("login");
@@ -64,6 +65,12 @@ export default function Auth() {
             value={form.password}
             onChange={set("password")}
           />
+          {/* Only offered when the server can actually send the email. */}
+          {mode === "login" && email_enabled && (
+            <Link to="/forgot-password" className="forgot-link">
+              Forgot password?
+            </Link>
+          )}
         </div>
         <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
