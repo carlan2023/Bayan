@@ -45,6 +45,10 @@ export const api = {
   register: (body) => request("/auth/register", { method: "POST", body }),
   login: (body) => request("/auth/login", { method: "POST", body }),
   me: () => request("/auth/me"),
+  forgotPassword: (email) => request("/auth/forgot", { method: "POST", body: { email } }),
+  resetPassword: (token, password) => request("/auth/reset", { method: "POST", body: { token, password } }),
+  invite: (token) => request(`/auth/invite${qs({ token })}`),
+  acceptInvite: (body) => request("/auth/accept-invite", { method: "POST", body }),
 
   // orders
   createOrder: (body) => request("/orders", { method: "POST", body }),
@@ -68,6 +72,11 @@ export const api = {
     customers: () => request("/admin/customers"),
     settings: () => request("/admin/settings"),
     saveSettings: (body) => request("/admin/settings", { method: "PUT", body }),
+    team: () => request("/admin/team"),
+    invite: (body) => request("/admin/invites", { method: "POST", body }),
+    revokeInvite: (id) => request(`/admin/invites/${id}`, { method: "DELETE" }),
+    removeAdmin: (id) => request(`/admin/team/${id}`, { method: "DELETE" }),
+    audit: (params = {}) => request(`/admin/audit${qs(params)}`),
     saveHero: (body) => request("/admin/hero", { method: "PUT", body }),
     uploadHeroMedia: async (file) => {
       const body = new FormData();

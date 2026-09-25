@@ -88,6 +88,8 @@
 .admin-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
 .admin-panel h3 { font-size: 1.05rem; margin-bottom: 14px; }
 .admin-panel h3 span { font-weight: 300; color: var(--ink-soft); font-size: 0.85rem; }
+/* Stacked panels on a page (Team, Audit) need air between them. */
+.admin-main > .admin-panel + .admin-panel { margin-top: 20px; }
 
 /* Tables */
 /* Wide tables (Orders runs to 8 columns) scroll inside their own container
@@ -248,3 +250,14 @@
 .tp-btn.primary { background: var(--pine); color: var(--on-primary); }
 .tp-btn.accent { background: var(--clay); color: var(--on-accent); }
 .tp-badge { background: var(--danger); color: var(--on-accent); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; }
+/* ---- Product form: previews and the per-variant stock table ---- */
+.thumb-preview { width: 64px; height: 78px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: inline-block; flex: none; }
+.thumb-preview.sm { width: 48px; height: 58px; }
+.hint { font-size: 0.8rem; color: var(--ink-soft); }
+.variant-editor { display: grid; gap: 8px; }
+.variant-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.variant-table td { padding-top: 6px; padding-bottom: 6px; }
+.variant-table input { width: 100%; }
+.variant-table tr.variant-out td:first-child,
+.variant-table tr.variant-out td:nth-child(2) { color: var(--danger); }
+.invite-link { word-break: break-all; font-size: 0.82rem; }

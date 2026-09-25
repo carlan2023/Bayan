@@ -8,6 +8,7 @@ import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
 import { HeartIcon, CheckIcon, WhatsAppIcon } from "../components/Icons";
 import { useWhatsApp } from "../whatsapp";
+import { findVariant, colorAvailable, priceOf } from "../variants";
 
 export default function Product() {
   const money = useMoney();
@@ -35,8 +36,12 @@ export default function Product() {
   // Default the options once the product arrives.
   useEffect(() => {
     if (!data?.product) return;
-    setSize(data.product.sizes.length === 1 ? data.product.sizes[0] : null);
-    setColor(data.product.colors[0]?.name || null);
+    const p = data.product;
+    // Open on a colour that can actually be bought, when there is one.
+    const firstColor = p.colors.find((c) => colorAvailable(p, c.name)) || p.colors[0];
+    setColor(firstColor?.name || null);
+    const onlySize = p.sizes.length === 1 ? p.sizes[0] : null;
+    setSize(onlySize);
   }, [data]);
 
   if (loading) return <div className="spinner">Loading…</div>;
@@ -55,9 +60,14 @@ export default function Product() {
 
   const { product, related } = data;
   const wished = has(product.id);
-  // Adding a sold-out item used to succeed and only fail at checkout.
-  const soldOut = product.stock <= 0;
-  const lowStock = !soldOut && product.stock <= urgency_stock_threshold;
+  // Stock is per size/colour. Adding a sold-out pair used to succeed and only
+  // fail at checkout; now the pair is disabled before it can be chosen.
+  const variant = size ? findVariant(product, size, color) : null;
+  const pairStock = (s) => findVariant(product, s, color)?.stock ?? 0;
+  const soldOut = product.stock <= 0 || (color != null && !colorAvailable(product, color));
+  const available = variant ? variant.stock : null; // null until a size is chosen
+  const lowStock = available != null && available > 0 && available <= urgency_stock_threshold;
+  const unitPrice = size ? priceOf(product, size, color) : product.price_cents;
 
   // Show the photo for the chosen colour, falling back to the product's main image.
   const activeColor = product.colors.find((c) => c.name === color);
@@ -66,6 +76,10 @@ export default function Product() {
   function addToBag() {
     if (!size) {
       setFormError("Please choose a size first.");
+      return;
+    }
+    if (!variant || variant.stock <= 0) {
+      setFormError(`${size} in ${color} is sold out. Please pick another size or colour.`);
       return;
     }
     setFormError("");
@@ -93,13 +107,13 @@ export default function Product() {
           <div className="cat">{product.category}</div>
           <h1>{product.name}</h1>
           <div className="price">
-            {money(product.price_cents)}
+            {money(unitPrice)}
             {product.compare_at_cents && <span className="was">{money(product.compare_at_cents)}</span>}
           </div>
           {lowStock && (
             <div className="stock-alert" role="status">
               <span className="stock-alert-dot" aria-hidden="true" />
-              Only {product.stock} left in stock — once it's gone, it's gone.
+              Only {available} left in {size} / {color}. Once it's gone, it's gone.
             </div>
           )}
 
@@ -112,7 +126,13 @@ export default function Product() {
                 key={c.name}
                 className={`opt color-opt ${color === c.name ? "active" : ""}`}
                 aria-pressed={color === c.name}
-                onClick={() => setColor(c.name)}
+                onClick={() => {
+                  setColor(c.name);
+                  // Keep the size only if that pair exists in the new colour.
+                  if (size && !(findVariant(product, size, c.name)?.stock > 0)) setSize(null);
+                  setFormError("");
+                }}
+                aria-label={colorAvailable(product, c.name) ? c.name : `${c.name}, sold out`}
               >
                 <span className="swatch-dot" style={{ background: c.hex }} />
                 {c.name}
@@ -122,22 +142,34 @@ export default function Product() {
 
           <div className="opt-label">Size</div>
           <div className="opt-row">
-            {product.sizes.map((s) => (
-              <button
-                key={s}
-                className={`opt ${size === s ? "active" : ""}`}
-                aria-pressed={size === s}
-                onClick={() => setSize(s)}
-              >
-                {s}
-              </button>
-            ))}
+            {product.sizes.map((s) => {
+              const out = pairStock(s) <= 0;
+              return (
+                <button
+                  key={s}
+                  className={`opt ${size === s ? "active" : ""} ${out ? "opt-out" : ""}`}
+                  aria-pressed={size === s}
+                  aria-label={out ? `${s}, sold out in ${color}` : s}
+                  disabled={out}
+                  onClick={() => {
+                    setSize(s);
+                    setFormError("");
+                  }}
+                >
+                  {s}
+                </button>
+              );
+            })}
           </div>
 
           {formError && <div className="alert alert-error">{formError}</div>}
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-primary btn-icon" onClick={addToBag} disabled={soldOut}>
+            <button
+              className="btn btn-primary btn-icon"
+              onClick={addToBag}
+              disabled={soldOut || (variant != null && variant.stock <= 0)}
+            >
               {soldOut ? (
                 "Out of stock"
               ) : added ? (
@@ -169,7 +201,14 @@ export default function Product() {
 
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}
           <div className="meta-line">
-            {soldOut ? "Out of stock" : product.stock > 10 ? "In stock" : `Only ${product.stock} left`} ·
+            {soldOut
+              ? `Sold out in ${color}`
+              : available == null
+                ? "Choose a size to see availability"
+                : available > 10
+                  ? "In stock"
+                  : `Only ${available} left`}{" "}
+            ·
             Cash on delivery available · Free delivery over {money(free_delivery_threshold_cents)}
           </div>
         </div>

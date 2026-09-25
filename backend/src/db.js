@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { totalStock } from "./variants.js";
 
 // Railway's MongoDB plugin exposes MONGO_URL; MONGODB_URI is the conventional override.
 const uri =
@@ -28,9 +29,29 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password_hash: { type: String, required: true },
     is_admin: { type: Boolean, default: false },
+    // Set on password reset. Admin requests compare it with the token's `iat`,
+    // so a reset locks out a stolen admin session rather than waiting 7 days.
+    password_changed_at: { type: Date, default: null },
     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
   },
   { timestamps, toJSON: baseToJSON }
+);
+
+const variantSchema = new mongoose.Schema(
+  {
+    size: { type: String, required: true, trim: true },
+    color: { type: String, required: true, trim: true },
+    sku: { type: String, default: "", trim: true },
+    stock: { type: Number, required: true, min: 0, default: 0 },
+    // Optional override; null means "the product's price".
+    price_cents: { type: Number, default: null, min: 1 },
+    // When the admin was last told this variant is running low. Drives the
+    // 24-hourly re-alert and is cleared the moment it's restocked.
+    low_stock_alert_at: { type: Date, default: null },
+  },
+  // Identity is the size/colour pair (unique per product), not a generated id:
+  // the admin editor replaces the whole array on save.
+  { _id: false }
 );
 
 const productSchema = new mongoose.Schema(
@@ -47,13 +68,32 @@ const productSchema = new mongoose.Schema(
     sizes: [String],
     fabric: { type: String, default: null },
     featured: { type: Boolean, default: false },
-    stock: { type: Number, default: 50, min: 0 },
-    // When the admin was last told this item is running low. Drives the
-    // 24-hourly re-alert and is cleared the moment it's restocked.
-    low_stock_alert_at: { type: Date, default: null },
+    // One row per size/colour pair — see src/variants.js. Stock is reserved and
+    // restored on the variant; nothing writes `stock` below directly.
+    variants: [variantSchema],
+    // Derived: always the sum of variant stock (recomputed on save, and moved
+    // in the same write as the variant by every $inc). Kept for the catalogue
+    // card, sorting and the dashboard, which only need "how many in total".
+    stock: { type: Number, default: 0, min: 0 },
   },
-  { timestamps, toJSON: baseToJSON }
+  {
+    timestamps,
+    toJSON: {
+      ...baseToJSON,
+      transform(doc, ret) {
+        baseToJSON.transform(doc, ret);
+        // The alert clock is internal bookkeeping, not catalogue data.
+        ret.variants = (ret.variants || []).map(({ low_stock_alert_at: _omit, ...v }) => v);
+        return ret;
+      },
+    },
+  }
 );
+
+productSchema.pre("validate", function syncDerivedStock(next) {
+  if (this.variants?.length) this.stock = totalStock(this.variants);
+  next();
+});
 
 // Catalogue search used an unindexed $or of three regexes — a full collection
 // scan per query. A text index serves whole-word matches from the index; the
@@ -64,6 +104,8 @@ productSchema.index(
 );
 // Supports the default catalogue sort and the admin listing.
 productSchema.index({ created_at: -1 });
+// The hourly low-stock sweep looks for any variant at or under the threshold.
+productSchema.index({ "variants.stock": 1 });
 
 export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
 
@@ -87,6 +129,8 @@ const orderSchema = new mongoose.Schema(
         qty: { type: Number, required: true, min: 1 },
         size: { type: String, default: null },
         color: { type: String, default: null },
+        // Snapshot for the packing slip; restocking matches on size/colour.
+        sku: { type: String, default: null },
       },
     ],
     subtotal_cents: { type: Number, required: true },
@@ -108,6 +152,7 @@ const orderSchema = new mongoose.Schema(
           qty: i.qty,
           size: i.size,
           color: i.color,
+          sku: i.sku ?? null,
         }));
         delete ret._id;
         delete ret.user;
@@ -289,7 +334,7 @@ export async function connectDB({ bootstrapAdmin = true } = {}) {
       await User.create({
         name: "Bayan Admin",
         email,
-        password_hash: bcrypt.hashSync(password, 10),
+        password_hash: await bcrypt.hash(password, 10),
         is_admin: true,
       });
       if (generated) {

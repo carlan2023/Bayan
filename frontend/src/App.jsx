@@ -18,6 +18,11 @@ import AdminCustomers from "./admin/Customers";
 import AdminStorefront from "./admin/Storefront";
 import AdminSettings from "./admin/Settings";
 import NotFound from "./pages/NotFound";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import AcceptInvite from "./pages/AcceptInvite";
+import AdminTeam from "./admin/Team";
+import AdminAudit from "./admin/Audit";
 
 function ShopLayout() {
   return (
@@ -50,6 +55,9 @@ export default function App() {
                   <Route path="/login" element={<Auth />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/wishlist" element={<Wishlist />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/accept-invite" element={<AcceptInvite />} />
                   {/* Catch-all inside the shop layout, so a bad URL still gets
                       a header, footer and a way back. */}
                   <Route path="*" element={<NotFound />} />
@@ -61,6 +69,8 @@ export default function App() {
                   <Route path="customers" element={<AdminCustomers />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="settings" element={<AdminSettings />} />
+                  <Route path="team" element={<AdminTeam />} />
+                  <Route path="audit" element={<AdminAudit />} />
                 </Route>
               </Routes>
             </BrowserRouter>

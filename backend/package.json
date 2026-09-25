@@ -12,7 +12,9 @@
     "start": "node src/server.js",
     "seed": "node src/seed.js",
     "migrate:remove-imageless": "node src/migrate-remove-imageless.js",
-    "test": "node --test \"test/*.test.js\""
+    "migrate:variants": "node src/migrate-variants.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:unit": "node --test test/config.test.js test/pricing.test.js test/uploads.test.js test/variants.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1139.0",
@@ -29,5 +31,8 @@
   },
   "engines": {
     "node": ">=20.9"
+  },
+  "devDependencies": {
+    "mongodb-memory-server-core": "^11.3.0"
   }
 }
