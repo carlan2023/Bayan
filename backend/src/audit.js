@@ -12,6 +12,7 @@ import mongoose from "mongoose";
  */
 export const AUDIT_ACTIONS = [
   "order.status",
+  "order.payment",
   "product.create",
   "product.price",
   "admin.invite",
