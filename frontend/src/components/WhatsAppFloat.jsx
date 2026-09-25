@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { waLink } from "../whatsapp";
+import { useWhatsApp } from "../whatsapp";
 import { WhatsAppIcon } from "./Icons";
 
 /**
@@ -10,6 +10,7 @@ import { WhatsAppIcon } from "./Icons";
  * so it never sits on top of content mid-read, but is always one flick away.
  */
 export default function WhatsAppFloat() {
+  const wa = useWhatsApp();
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
   const settleTimer = useRef(null);
@@ -34,10 +35,13 @@ export default function WhatsAppFloat() {
     };
   }, []);
 
+  // No number configured → no button, rather than a link to someone else's phone.
+  if (!wa.enabled) return null;
+
   return (
     <a
       className={`wa-float ${hidden ? "wa-hidden" : ""}`}
-      href={waLink("Hello Bayan! I'd like to ask about your products.")}
+      href={wa.link()}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"

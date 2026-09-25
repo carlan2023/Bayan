@@ -7,10 +7,11 @@ import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
 import { HeartIcon, CheckIcon, WhatsAppIcon } from "../components/Icons";
-import { waProductLink } from "../whatsapp";
+import { useWhatsApp } from "../whatsapp";
 
 export default function Product() {
   const money = useMoney();
+  const wa = useWhatsApp();
   const { slug } = useParams();
   const { add } = useCart();
   const { has, toggle } = useWishlist();
@@ -154,14 +155,16 @@ export default function Product() {
             >
               {wished ? "Saved" : "Wishlist"} <HeartIcon size={16} filled={wished} />
             </button>
-            <a
-              className="btn btn-wa btn-icon"
-              href={waProductLink(product)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Ask on WhatsApp <WhatsAppIcon size={16} />
-            </a>
+            {wa.enabled && (
+              <a
+                className="btn btn-wa btn-icon"
+                href={wa.productLink(product)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ask on WhatsApp <WhatsAppIcon size={16} />
+              </a>
+            )}
           </div>
 
           {product.fabric && <div className="meta-line">Fabric: {product.fabric}</div>}

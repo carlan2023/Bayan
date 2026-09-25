@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { useConfig, useMoney, useWishlist } from "../store";
 import ProductImage from "./ProductImage";
 import { HeartIcon, WhatsAppIcon } from "./Icons";
-import { waProductLink } from "../whatsapp";
+import { useWhatsApp } from "../whatsapp";
 
 export default function ProductCard({ product }) {
   const money = useMoney();
+  const wa = useWhatsApp();
   const { has, toggle } = useWishlist();
   const { urgency_stock_threshold } = useConfig();
   const [error, setError] = useState("");
@@ -58,10 +59,12 @@ export default function ProductCard({ product }) {
         <HeartIcon size={16} filled={wished} />
       </button>
 
-      {/* WhatsApp enquiry — a real link, also outside the card's Link. */}
+      {/* WhatsApp enquiry — a real link, also outside the card's Link. Hidden
+          when the shop has no WhatsApp number configured. */}
+      {wa.enabled && (
       <a
         className="wish-btn wa-btn"
-        href={waProductLink(product)}
+        href={wa.productLink(product)}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
@@ -70,6 +73,7 @@ export default function ProductCard({ product }) {
       >
         <WhatsAppIcon size={16} />
       </a>
+      )}
 
       <div className="swatches">
         {product.colors.map((c) => (

@@ -217,3 +217,34 @@
   .admin-side .side-foot { border: none; padding: 0; margin-left: auto; }
   .admin-main { padding: 20px; }
 }
+
+/* ---- Settings ---- */
+.form-2col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 900px) { .form-2col { grid-template-columns: 1fr; } }
+.settings-section { margin-bottom: 20px; }
+.settings-section .hint { display: block; margin-top: 4px; }
+.logo-preview { height: 40px; max-width: 160px; object-fit: contain; }
+.settings-theme { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .settings-theme { grid-template-columns: 1fr; } }
+.palette-grid { display: grid; gap: 8px; }
+.palette-row { display: flex; align-items: center; gap: 10px; }
+.palette-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); }
+.dept-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.dept-row .input-sm:first-of-type { flex: 1; min-width: 140px; }
+.dept-icon { width: 36px; height: 36px; border-radius: 8px; flex: none; }
+.perk-edit { display: grid; gap: 8px; }
+
+/* The preview wears the draft palette: applyTheme() writes the tokens onto it. */
+.theme-preview { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-body); }
+.tp-top { background: var(--pine-dark); color: var(--on-dark); font-size: 0.75rem; padding: 6px 12px; min-height: 26px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tp-body { padding: 16px; }
+.tp-logo { font-family: var(--font-display); font-size: 1.5rem; color: var(--pine); margin-bottom: 12px; }
+.tp-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px; }
+.tp-card p { color: var(--ink-soft); font-size: 0.9rem; margin: 6px 0 12px; }
+.tp-eyebrow { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay-dark); }
+.tp-head { font-family: var(--font-display); font-size: 1.3rem; }
+.tp-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tp-btn { padding: 7px 14px; border-radius: 999px; font-size: 0.8rem; }
+.tp-btn.primary { background: var(--pine); color: var(--on-primary); }
+.tp-btn.accent { background: var(--clay); color: var(--on-accent); }
+.tp-badge { background: var(--danger); color: var(--on-accent); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; }
