@@ -136,7 +136,7 @@ export default function ProductForm({ initial, editingId, onSaved, onCancel, cur
 
   return (
     <form className="drawer form-grid" onSubmit={save}>
-      <h3>{editingId ? "Edit product" : "New product"}</h3>
+      <h2>{editingId ? "Edit product" : "New product"}</h2>
       {error && (
         <div className="alert alert-error" role="alert">
           {error}

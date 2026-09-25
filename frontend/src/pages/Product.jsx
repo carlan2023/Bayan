@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useCart, useConfig, useMoney, useWishlist } from "../store";
 import { useAsync } from "../useAsync";
+import { usePageTitle } from "../usePageTitle";
 import ProductImage from "../components/ProductImage";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
@@ -19,6 +20,7 @@ export default function Product() {
   const { free_delivery_threshold_cents, urgency_stock_threshold } = useConfig();
 
   const { data, error: loadError, loading, reload } = useAsync(() => api.product(slug), [slug]);
+  usePageTitle(data?.product?.name || (loadError ? "Product not found" : ""));
 
   const [size, setSize] = useState(null);
   const [color, setColor] = useState(null);
@@ -162,7 +164,15 @@ export default function Product() {
             })}
           </div>
 
-          {formError && <div className="alert alert-error">{formError}</div>}
+          {formError && (
+            <div className="alert alert-error" role="alert">
+              {formError}
+            </div>
+          )}
+          {/* The button's "Added ✓" is visual only; this says it out loud. */}
+          <div className="sr-only" role="status" aria-live="polite">
+            {added ? `Added ${product.name}, ${size}, ${color}, to your bag.` : ""}
+          </div>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button

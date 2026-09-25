@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useCart, useConfig, useDelivery, useMoney } from "../store";
@@ -6,6 +7,7 @@ import { NETWORK_LABELS, rememberOrderToken } from "../payment";
 import CartNotice from "../components/CartNotice";
 
 export default function Checkout() {
+  usePageTitle("Checkout");
   const money = useMoney();
   const { items, subtotal, clear, revalidate } = useCart();
   const { user } = useAuth();
@@ -40,7 +42,7 @@ export default function Checkout() {
   if (order) {
     return (
       <div className="container empty">
-        <h2>Thank you, {order.customer_name.split(" ")[0]}!</h2>
+        <h1 className="empty-title">Thank you, {order.customer_name.split(" ")[0]}!</h1>
         <p style={{ maxWidth: 480, margin: "0 auto 8px" }}>
           Order <strong>#{order.number}</strong> is confirmed for <strong>{money(order.total_cents)}</strong>.
         </p>
@@ -65,7 +67,7 @@ export default function Checkout() {
           <CartNotice changes={changes} />
         </div>
         <div className="empty">
-          <h2>Nothing to check out</h2>
+          <h1 className="empty-title">Nothing to check out</h1>
           <Link to="/shop" className="btn btn-primary">
             Browse products
           </Link>
@@ -282,7 +284,7 @@ export default function Checkout() {
         </form>
 
         <div className="panel">
-          <h3 style={{ marginBottom: 12 }}>Order summary</h3>
+          <h2 className="panel-title">Order summary</h2>
           {items.map((i) => (
             <div className="summary-line" key={`${i.product_id}-${i.size}-${i.color}`}>
               <span>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useConfig, useMoney } from "../store";
@@ -13,6 +14,7 @@ const POLL_MS = 4000;
  * query parameters on the way back are ignored: only the server decides.
  */
 export default function OrderPayment() {
+  usePageTitle("Payment");
   const { id } = useParams();
   const [params] = useSearchParams();
   const token = params.get("token") || orderToken(id);

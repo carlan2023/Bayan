@@ -35,7 +35,7 @@ const toCents = (v) => Math.round(Number(v) * 100);
 function Section({ title, hint, children }) {
   return (
     <section className="admin-panel form-grid settings-section">
-      <h3>{title}</h3>
+      <h2>{title}</h2>
       {hint && <p className="hint">{hint}</p>}
       {children}
     </section>

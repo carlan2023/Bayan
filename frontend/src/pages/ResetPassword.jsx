@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../store";
 
 export default function ResetPassword() {
+  usePageTitle("Choose a new password");
   const [params] = useSearchParams();
   const token = params.get("token") || "";
   const { signIn } = useAuth();

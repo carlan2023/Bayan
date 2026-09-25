@@ -155,7 +155,7 @@ export default function Products() {
                 <th className="num">Price</th>
                 <th className="num">Stock</th>
                 <th>Featured</th>
-                <th></th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

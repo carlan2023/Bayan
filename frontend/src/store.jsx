@@ -57,7 +57,8 @@ export function ConfigProvider({ children }) {
   // Before paint, so a retheme never shows a frame of the old palette.
   useLayoutEffect(() => {
     applyTheme(config);
-    if (config.page_title) document.title = config.page_title;
+    // The shop's language drives screen-reader pronunciation and hyphenation.
+    if (config.locale) document.documentElement.lang = config.locale.split("-")[0];
   }, [config]);
 
   const actions = useMemo(

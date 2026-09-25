@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link } from "react-router-dom";
 import { useCart, useDelivery, useMoney } from "../store";
 import ProductImage from "../components/ProductImage";
 import CartNotice from "../components/CartNotice";
 
 export default function Cart() {
+  usePageTitle("Your bag");
   const money = useMoney();
   const { items, subtotal, setQty, remove, keyOf, revalidate, maxQty } = useCart();
   const delivery = useDelivery(subtotal);
@@ -24,7 +26,7 @@ export default function Cart() {
           <CartNotice changes={changes} />
         </div>
         <div className="empty">
-          <h2>Your bag is empty</h2>
+          <h1 className="empty-title">Your bag is empty</h1>
           <p style={{ marginBottom: 24 }}>Everything you add will appear here.</p>
           <Link to="/shop" className="btn btn-primary">
             Start shopping
@@ -79,7 +81,7 @@ export default function Cart() {
           })}
         </div>
         <div className="panel">
-          <h3 style={{ marginBottom: 12 }}>Summary</h3>
+          <h2 className="panel-title">Summary</h2>
           <div className="summary-line">
             <span>Subtotal</span>
             <span>{money(subtotal)}</span>

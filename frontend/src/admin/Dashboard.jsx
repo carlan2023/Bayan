@@ -61,11 +61,11 @@ export default function Dashboard() {
 
       <div className="admin-grid">
         <div className="admin-panel">
-          <h3>Revenue <span>— last 14 days</span></h3>
+          <h2>Revenue <span>— last 14 days</span></h2>
           <BarChart data={bars} formatValue={money} />
         </div>
         <div className="admin-panel">
-          <h3>Orders by status</h3>
+          <h2>Orders by status</h2>
           <Donut
             segments={orders_by_status.map((s) => ({
               label: s.status,
@@ -78,7 +78,7 @@ export default function Dashboard() {
 
       <div className="admin-grid">
         <div className="admin-panel">
-          <h3>Top products <span>— by revenue</span></h3>
+          <h2>Top products <span>— by revenue</span></h2>
           {top_products.length === 0 ? (
             <div className="empty-mini">No sales yet — top sellers will appear here.</div>
           ) : (
@@ -101,7 +101,7 @@ export default function Dashboard() {
           )}
         </div>
         <div className="admin-panel">
-          <h3>Revenue by category</h3>
+          <h2>Revenue by category</h2>
           {revenue_by_category.length === 0 ? (
             <div className="empty-mini">No sales yet.</div>
           ) : (
@@ -115,7 +115,7 @@ export default function Dashboard() {
 
       <div className="admin-grid">
         <div className="admin-panel">
-          <h3>Recent orders</h3>
+          <h2>Recent orders</h2>
           {recent_orders.length === 0 ? (
             <div className="empty-mini">No orders yet.</div>
           ) : (
@@ -143,7 +143,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="admin-panel">
-          <h3>Low stock <span>— 10 or fewer left</span></h3>
+          <h2>Low stock <span>— 10 or fewer left</span></h2>
           {low_stock.length === 0 ? (
             <div className="empty-mini">Every size and colour is well stocked.</div>
           ) : (

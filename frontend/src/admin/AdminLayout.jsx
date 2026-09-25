@@ -1,10 +1,12 @@
 import { NavLink, Link, Outlet, Navigate } from "react-router-dom";
+import { usePageTitle } from "../usePageTitle";
 import { useAuth } from "../store";
 import Notifications from "./Notifications";
 import Wordmark from "../components/Wordmark";
 import "./admin.css";
 
 export default function AdminLayout() {
+  usePageTitle("Admin");
   const { user, logout } = useAuth();
 
   if (!user) return <Navigate to="/login" replace />;

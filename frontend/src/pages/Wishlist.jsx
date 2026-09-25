@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth, useWishlist } from "../store";
@@ -8,6 +9,7 @@ import ErrorState from "../components/ErrorState";
 import { HeartIcon } from "../components/Icons";
 
 export default function Wishlist() {
+  usePageTitle("Wishlist");
   const { user } = useAuth();
   const { toggle } = useWishlist();
   const { data, error, loading, reload } = useAsync(

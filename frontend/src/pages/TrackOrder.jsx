@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageTitle } from "../usePageTitle";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useMoney } from "../store";
@@ -9,6 +10,7 @@ const STEP_LABELS = { pending: "Received", confirmed: "Confirmed", dispatched: "
 
 /** Guest order lookup: order number + the phone number it was placed with. */
 export default function TrackOrder() {
+  usePageTitle("Track an order");
   const money = useMoney();
   const [params] = useSearchParams();
   const [number, setNumber] = useState(params.get("number") || "");
@@ -16,10 +18,6 @@ export default function TrackOrder() {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    document.title = "Track an order";
-  }, []);
 
   async function submit(e) {
     e.preventDefault();

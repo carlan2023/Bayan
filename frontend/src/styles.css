@@ -29,7 +29,8 @@
      palette (see deriveTokens), so a retheme carries its tints and overlays
      with it rather than leaving pine-tinted borders on a burgundy shop. */
   --on-primary: #f5f1e6; /* text on --pine buttons, pills, department cards */
-  --on-accent: #ffffff; /* text on --clay badges and buttons */
+  --on-accent: #ffffff; /* text on --clay-fill badges and buttons */
+  --clay-fill: #aa6447; /* --clay darkened just enough for --on-accent text to reach 4.5:1 */
   --on-dark: #f3eee0; /* headings on dark surfaces: topbar, hero, footer */
   --on-dark-soft: #d9d3c2; /* body copy on dark surfaces */
   --on-dark-muted: #c5bfab; /* secondary copy on dark surfaces */
@@ -64,7 +65,7 @@
   --violet-ink: #5b3f7e;
   --whatsapp: #25d366;
   --whatsapp-dark: #1da851;
-  --on-whatsapp: #ffffff;
+  --on-whatsapp: #10301f; /* white on WhatsApp green is 2:1; dark green text reads */
 
   --radius: 14px;
   --radius-sm: 9px;
@@ -154,7 +155,6 @@ img, svg { display: block; max-width: 100%; }
   padding: 8px 16px;
   width: 190px;
   background: var(--bg);
-  outline: none;
   transition: border-color 0.15s, width 0.2s;
 }
 .search-form input:focus { border-color: var(--pine); width: 240px; }
@@ -216,7 +216,6 @@ img, svg { display: block; max-width: 100%; }
     border-radius: 999px;
     padding: 11px 18px;
     background: var(--bg);
-    outline: none;
   }
   .mobile-search input:focus { border-color: var(--pine); }
 
@@ -269,7 +268,7 @@ img, svg { display: block; max-width: 100%; }
   position: absolute;
   top: -8px;
   right: -14px;
-  background: var(--clay);
+  background: var(--clay-fill);
   color: var(--on-accent);
   font-size: 0.68rem;
   min-width: 18px;
@@ -295,7 +294,7 @@ img, svg { display: block; max-width: 100%; }
 .btn:active { transform: scale(0.98); }
 .btn-primary { background: var(--pine); color: var(--on-primary); }
 .btn-primary:hover { background: var(--pine-dark); }
-.btn-accent { background: var(--clay); color: var(--on-accent); }
+.btn-accent { background: var(--clay-fill); color: var(--on-accent); }
 .btn-accent:hover { background: var(--clay-dark); }
 .btn-ghost { background: transparent; color: var(--pine); border: 1.5px solid var(--pine); }
 .btn-ghost:hover { background: var(--pine-tint); }
@@ -449,7 +448,7 @@ img, svg { display: block; max-width: 100%; }
   position: absolute;
   top: 12px;
   left: 12px;
-  background: var(--clay);
+  background: var(--clay-fill);
   color: var(--on-accent);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
@@ -591,7 +590,6 @@ select.pill { appearance: none; padding-right: 28px; }
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   background: var(--surface);
-  outline: none;
 }
 .form-grid input:focus, .form-grid textarea:focus { border-color: var(--pine); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -621,7 +619,8 @@ select.pill { appearance: none; padding-right: 28px; }
 .page-title h1 { font-size: 2.2rem; }
 .page-title p { color: var(--ink-soft); }
 .empty { text-align: center; padding: 80px 20px; color: var(--ink-soft); }
-.empty h2 { margin-bottom: 10px; }
+.empty h2, .empty .empty-title { margin-bottom: 10px; font-size: 1.6rem; }
+.panel-title { font-size: 1.17rem; margin-bottom: 12px; }
 
 .order-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 20px 24px; margin-bottom: 16px; }
 .order-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -641,7 +640,7 @@ select.pill { appearance: none; padding-right: 28px; }
 }
 .footer .logo { color: var(--on-dark); margin-bottom: 8px; }
 .footer-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
-.footer small { display: block; margin-top: 24px; opacity: 0.6; }
+.footer small { display: block; margin-top: 24px; color: var(--on-dark-muted); }
 
 .auth-wrap { max-width: 440px; margin: 60px auto; }
 .auth-wrap .panel { padding: 36px; }
@@ -718,7 +717,7 @@ select.pill { appearance: none; padding-right: 28px; }
 .notif-bell:hover { background: rgba(255, 255, 255, 0.06); color: var(--on-dark); }
 .notif-badge {
   margin-left: auto;
-  background: var(--clay);
+  background: var(--clay-fill);
   color: var(--on-accent);
   font-size: 0.7rem;
   font-weight: 500;
@@ -915,3 +914,29 @@ select.pill { appearance: none; padding-right: 28px; }
 /* Beat `.form-grid label` (uppercase field labels): these labels are cards. */
 .form-grid .pay-option { display: flex; text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--ink); margin: 0; }
 .form-grid .pay-momo .opt { text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink); margin: 0; }
+
+/* ---- Keyboard access ---- */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  background: var(--pine-dark);
+  color: var(--on-dark);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  transition: top 0.15s;
+}
+.skip-link:focus { top: 12px; }
+main:focus { outline: none; }
+/* One visible focus ring for everything focusable by keyboard; mouse clicks don't show it. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+}
+.hero :where(a, button):focus-visible,
+.footer :where(a, button):focus-visible,
+.admin-side :where(a, button):focus-visible { outline-color: var(--on-dark); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

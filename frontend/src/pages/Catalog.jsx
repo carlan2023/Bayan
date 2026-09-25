@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAsync } from "../useAsync";
+import { usePageTitle } from "../usePageTitle";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ErrorState";
 
@@ -38,6 +39,7 @@ export default function Catalog() {
   }
 
   const title = search ? `Results for “${search}”` : category || "All products";
+  usePageTitle(title);
 
   return (
     <div className="container">
@@ -61,7 +63,7 @@ export default function Catalog() {
             </button>
           ))}
         </div>
-        <select className="pill" value={sort} onChange={(e) => setParam("sort", e.target.value)}>
+        <select className="pill" aria-label="Sort products" value={sort} onChange={(e) => setParam("sort", e.target.value)}>
           {SORTS.map(([v, label]) => (
             <option key={v} value={v}>
               {label}
@@ -80,11 +82,16 @@ export default function Catalog() {
           <p>Try a different search or browse a department instead.</p>
         </div>
       ) : (
+        <section aria-labelledby="catalog-results">
+        <h2 id="catalog-results" className="sr-only">
+          {products.length} product{products.length === 1 ? "" : "s"}
+        </h2>
         <div className="grid" style={{ paddingBottom: 40 }}>
           {products.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
         </div>
+        </section>
       )}
     </div>
   );

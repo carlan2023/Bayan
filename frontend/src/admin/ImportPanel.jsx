@@ -41,7 +41,7 @@ export default function ImportPanel({ onDone, onClose }) {
 
   return (
     <div className="drawer form-grid" role="region" aria-labelledby="import-title">
-      <h3 id="import-title">Import products from a spreadsheet</h3>
+      <h2 id="import-title">Import products from a spreadsheet</h2>
       <p className="hint">
         One row per size and colour, as CSV or Excel (.xlsx). Products are matched by handle (or name), so importing an
         edited sheet again updates them instead of adding copies. Prices are in the shop's currency, e.g. 175000.{" "}

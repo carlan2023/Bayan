@@ -1,4 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
+import { usePageTitle } from "../usePageTitle";
 import { api } from "../api";
 import { useAuth, useMoney } from "../store";
 import { PAYMENT_LABELS } from "../payment";
@@ -6,6 +7,7 @@ import { useAsync } from "../useAsync";
 import ErrorState from "../components/ErrorState";
 
 export default function Account() {
+  usePageTitle("My account");
   const money = useMoney();
   const { user } = useAuth();
   // Previously a failed fetch was swallowed into an empty array, so a network

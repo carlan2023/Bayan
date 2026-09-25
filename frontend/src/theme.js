@@ -50,6 +50,35 @@ export const mix = (a, b, t) => {
   return toHex(ca.map((c, i) => c + (cb[i] - c) * t));
 };
 
+/** WCAG relative luminance and contrast ratio of two hex colours. */
+const luminance = (hex) => {
+  const [r, g, b] = channels(hex).map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+export const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+/**
+ * The shop's colour, darkened (or lightened) just enough that `text` on it
+ * reaches `ratio` — so an owner's accent stays recognisably theirs while
+ * button and badge labels stay readable (WCAG AA, 4.5:1).
+ */
+export function readableFill(bg, text, ratio = 4.5) {
+  const step = luminance(text) > 0.5 ? -2 : 2;
+  let c = bg;
+  for (let i = 0; i < 128 && contrast(c, text) < ratio; i++) c = shade(c, step);
+  return c;
+}
+
+/** Whichever candidate text colour reads best on `bg`. */
+export const bestText = (bg, candidates) =>
+  candidates.reduce((best, c) => (contrast(bg, c) > contrast(bg, best) ? c : best), candidates[0]);
+
 /** A hex colour at the given opacity. */
 export const alpha = (hex, a) => `rgba(${channels(hex).join(", ")}, ${a})`;
 
@@ -61,8 +90,10 @@ export const alpha = (hex, a) => `rgba(${channels(hex).join(", ")}, ${a})`;
  */
 export function deriveTokens(p) {
   return {
-    "--on-primary": mix(p.bg, p.surface, 0.3),
+    // A light primary (an owner's pastel) gets dark text instead of cream.
+    "--on-primary": bestText(p.primary, [mix(p.bg, p.surface, 0.3), p.ink]),
     "--on-accent": "#ffffff",
+    "--clay-fill": readableFill(p.accent, "#ffffff"),
     "--on-dark": mix(p.bg, p.primary_dark, 0.02),
     "--on-dark-soft": mix(p.bg, p.primary_dark, 0.12),
     "--on-dark-muted": mix(p.bg, p.primary_dark, 0.2),

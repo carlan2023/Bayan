@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth, useConfig, useCopy } from "../store";
+import { usePageTitle } from "../usePageTitle";
 
 export default function Auth() {
   const { login, register } = useAuth();
@@ -9,6 +10,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState("login");
+  usePageTitle(mode === "login" ? "Sign in" : "Create an account");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);

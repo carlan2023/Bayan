@@ -131,7 +131,7 @@ export default function Orders() {
                 <th className="num">Total</th>
                 <th>Payment</th>
                 <th>Status</th>
-                <th></th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -180,6 +180,7 @@ export default function Orders() {
                     <td>
                       <select
                         className="select-sm"
+                        aria-label={`Status of order ${o.number}`}
                         value={o.status}
                         onChange={(e) => setStatus(o, e.target.value)}
                       >

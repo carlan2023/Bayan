@@ -57,7 +57,7 @@
   transition: background 0.12s, color 0.12s;
 }
 .admin-side nav a:hover { background: var(--admin-side-hover); color: var(--admin-side-ink-strong); }
-.admin-side nav a.active { background: var(--clay); color: var(--on-accent); }
+.admin-side nav a.active { background: var(--clay-fill); color: var(--on-accent); }
 .admin-side .side-foot { border-top: 1px solid var(--admin-side-rule); padding-top: 14px; font-size: 0.85rem; }
 .admin-side .side-foot .who { color: var(--admin-side-ink-strong); font-weight: 500; }
 .admin-side .side-foot button { background: none; border: none; color: var(--gold); padding: 4px 0; font-size: 0.85rem; }
@@ -86,8 +86,8 @@
 .admin-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
 @media (max-width: 1100px) { .admin-grid { grid-template-columns: 1fr; } }
 .admin-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
-.admin-panel h3 { font-size: 1.05rem; margin-bottom: 14px; }
-.admin-panel h3 span { font-weight: 300; color: var(--ink-soft); font-size: 0.85rem; }
+.admin-panel h2, .admin-panel h3 { font-size: 1.05rem; margin-bottom: 14px; }
+.admin-panel h2 span, .admin-panel h3 span { font-weight: 300; color: var(--ink-soft); font-size: 0.85rem; }
 /* Stacked panels on a page (Team, Audit) need air between them. */
 .admin-main > .admin-panel + .admin-panel { margin-top: 20px; }
 
@@ -147,7 +147,7 @@
   padding: 26px;
   margin-bottom: 20px;
 }
-.drawer h3 { margin-bottom: 16px; }
+.drawer h2, .drawer h3 { font-size: 1.17rem; margin-bottom: 16px; }
 .form-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 900px) { .form-3col { grid-template-columns: 1fr; } }
 .color-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -248,7 +248,7 @@
 .tp-btns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tp-btn { padding: 7px 14px; border-radius: 999px; font-size: 0.8rem; }
 .tp-btn.primary { background: var(--pine); color: var(--on-primary); }
-.tp-btn.accent { background: var(--clay); color: var(--on-accent); }
+.tp-btn.accent { background: var(--clay-fill); color: var(--on-accent); }
 .tp-badge { background: var(--danger); color: var(--on-accent); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; }
 /* ---- Product form: previews and the per-variant stock table ---- */
 .thumb-preview { width: 64px; height: 78px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: inline-block; flex: none; }
