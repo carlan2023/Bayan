@@ -67,9 +67,34 @@ export function themeCss(settings) {
   return decls.length ? `:root{${decls.join(";")}}` : "";
 }
 
-/** Rewrite the built index.html for this shop. `config` is the GET /api/config payload. */
-export function renderShell(html, config) {
-  const head = [];
+/** <head> tags for one page's meta (see seo.js pageMeta); empty for none. */
+export function metaTags(meta, config) {
+  if (!meta) return [];
+  const tags = [];
+  const m = (name, content) => content && tags.push(`<meta name="${name}" content="${escapeHtml(content)}" />`);
+  const p = (property, content) => content && tags.push(`<meta property="${property}" content="${escapeHtml(content)}" />`);
+  m("description", meta.description);
+  if (meta.noindex) m("robots", "noindex, nofollow");
+  if (meta.canonical) tags.push(`<link rel="canonical" href="${escapeHtml(meta.canonical)}" />`);
+  p("og:site_name", config.shop_name);
+  p("og:title", meta.title);
+  p("og:description", meta.description);
+  p("og:type", meta.type);
+  if (meta.canonical) p("og:url", meta.canonical);
+  p("og:image", meta.image);
+  m("twitter:card", meta.image ? "summary_large_image" : "summary");
+  m("theme-color", config.palette?.primary);
+  // application/ld+json is data, never executed, so the CSP needs nothing.
+  for (const ld of meta.jsonLd || []) tags.push(`<script type="application/ld+json">${safeJson(ld)}</script>`);
+  return tags;
+}
+
+/**
+ * Rewrite the built index.html for this shop. `config` is the GET /api/config
+ * payload; `meta` (optional) is this page's pageMeta().
+ */
+export function renderShell(html, config, meta = null) {
+  const head = [...metaTags(meta, config)];
   const css = themeCss(config);
   if (css) head.push(`<style id="shop-theme">${css}</style>`);
 
@@ -81,7 +106,10 @@ export function renderShell(html, config) {
   }
   head.push(`<script type="application/json" id="shop-config">${safeJson(config)}</script>`);
 
-  let out = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(config.page_title)}</title>`);
+  let out = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta?.title || config.page_title)}</title>`);
+  // The shop's language, so screen readers pronounce the page correctly from the first byte.
+  const lang = String(config.locale || "en").split("-")[0].replace(/[^a-z]/gi, "") || "en";
+  out = out.replace(/<html([^>]*)\blang="[^"]*"/i, `<html$1lang="${lang}"`);
   out = out.replace(/<\/head>/i, `${head.join("\n")}\n</head>`);
   return out;
 }

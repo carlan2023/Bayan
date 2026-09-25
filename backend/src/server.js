@@ -5,12 +5,14 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import mongoose from "mongoose";
-import { connectDB, Setting } from "./db.js";
+import { connectDB, Setting, Product } from "./db.js";
 import { startStockAlerts } from "./stock-alerts.js";
 import { getSettings, publicConfig } from "./config.js";
 import { renderShell } from "./shell.js";
 import { emailEnabled } from "./mailer.js";
 import { storageOrigin } from "./storage.js";
+import { pageMeta, sitemapXml, robotsTxt } from "./seo.js";
+import { appUrl } from "./mailer.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
@@ -166,6 +168,37 @@ app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint not found
 // plain 404, never the SPA's index.html served with a 200 as if it were the image.
 app.use("/uploads", (_req, res) => res.status(404).type("text/plain").send("Not found"));
 
+/** Absolute origin for canonical URLs and the sitemap: APP_URL, else this request's. */
+const siteBase = (req) => appUrl() || `${req.protocol}://${req.get("host")}`;
+
+app.get("/robots.txt", (req, res) => res.type("text/plain").send(robotsTxt(siteBase(req))));
+app.get("/sitemap.xml", async (req, res, next) => {
+  try {
+    const [products, categories] = await Promise.all([
+      Product.find({}).select("slug updated_at").sort({ updated_at: -1 }).limit(45000).lean(),
+      Product.distinct("category"),
+    ]);
+    res.set("Cache-Control", "public, max-age=3600").type("application/xml").send(sitemapXml(siteBase(req), { products, categories }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Title, description, canonical, Open Graph and JSON-LD for this URL (src/seo.js). */
+async function metaFor(req, settings) {
+  const slug = req.path.match(/^\/product\/([^/]+)\/?$/)?.[1];
+  const product = slug ? await Product.findOne({ slug: decodeURIComponent(slug) }).lean() : null;
+  const hero = req.path === "/" ? (await Setting.findById("hero").lean())?.data : null;
+  return pageMeta({
+    path: req.path,
+    query: req.query,
+    settings,
+    base: siteBase(req),
+    product,
+    heroImage: hero?.media_type === "image" ? hero.url : null,
+  });
+}
+
 // In production (e.g. Railway) serve the built frontend from the same service,
 // so the SPA and API share one origin and no CORS/proxy config is needed.
 const distDir = process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist");
@@ -179,8 +212,12 @@ if (fs.existsSync(distDir)) {
     try {
       // SPA fallback, with this shop's title, theme and config written in so
       // the first paint is already theirs (see src/shell.js).
-      const html = renderShell(indexHtml, await clientConfig());
-      res.set("Cache-Control", "no-cache").type("html").send(html);
+      const config = await clientConfig();
+      const meta = await metaFor(req, await getSettings());
+      const html = renderShell(indexHtml, config, meta);
+      // Unknown URLs and missing products still render the SPA's own 404 page,
+      // but with a 404 status so they aren't indexed as real pages.
+      res.status(meta.status).set("Cache-Control", "no-cache").type("html").send(html);
     } catch {
       res.sendFile(path.join(distDir, "index.html")); // settings unreadable: default shell
     }
