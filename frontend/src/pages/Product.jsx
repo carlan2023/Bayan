@@ -101,7 +101,7 @@ export default function Product() {
     <div className="container">
       <div className="pdp">
         <div className="pdp-img">
-          <ProductImage product={heroProduct} ratio={1.1} />
+          <ProductImage product={heroProduct} ratio={1.1} sizes="(max-width: 900px) 100vw, 560px" />
         </div>
         <div className="pdp-info">
           <div className="cat">{product.category}</div>

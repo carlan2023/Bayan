@@ -10,12 +10,14 @@ import { startStockAlerts } from "./stock-alerts.js";
 import { getSettings, publicConfig } from "./config.js";
 import { renderShell } from "./shell.js";
 import { emailEnabled } from "./mailer.js";
+import { storageOrigin } from "./storage.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
 import wishlistRoutes from "./routes/wishlist.js";
 import adminRoutes, { UPLOAD_DIR } from "./routes/admin.js";
 import adminSettingsRoutes from "./routes/admin-settings.js";
+import adminImportRoutes from "./routes/admin-import.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +35,7 @@ const cspImgHosts = (process.env.CSP_IMG_HOSTS || "")
   .split(",")
   .map((s) => s.trim())
   .filter((s) => /^https:\/\/[^\s'";]+$/.test(s));
+const storageHosts = [storageOrigin()].filter(Boolean);
 
 app.use(
   helmet({
@@ -50,9 +53,10 @@ app.use(
         // elsewhere must add that host to CSP_IMG_HOSTS (comma-separated), or
         // upload the file instead — uploads always work. data: is for the
         // generated SVG placeholders, blob: for admin upload previews.
-        imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", ...cspImgHosts],
+        // With S3/R2 storage, uploads are served from the bucket's public origin.
+        imgSrc: ["'self'", "data:", "blob:", "https://images.unsplash.com", ...cspImgHosts, ...storageHosts],
         // Hero banner video is always an upload (enforced in routes/admin.js).
-        mediaSrc: ["'self'", "blob:"],
+        mediaSrc: ["'self'", "blob:", ...storageHosts],
         connectSrc: ["'self'"],
         // wa.me "Ask on WhatsApp" links are plain <a target="_blank">
         // navigations, which CSP does not govern — nothing to allow here.
@@ -118,6 +122,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 // Mounted before the general admin router; each applies the admin gate itself.
 app.use("/api/admin/settings", adminSettingsRoutes);
+app.use("/api/admin/import", adminImportRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Uploaded product images (persisted on a volume in production). nosniff stops

@@ -47,7 +47,7 @@ export default function Cart() {
             return (
               <div className="cart-row" key={k}>
                 <Link to={`/product/${i.slug}`} className="thumb">
-                  <ProductImage product={i} ratio={1} />
+                  <ProductImage product={i} ratio={1} sizes="96px" />
                 </Link>
                 <div>
                   <Link to={`/product/${i.slug}`}>

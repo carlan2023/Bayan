@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import fs from "fs";
-import path from "path";
 
 /**
  * Upload type detection.
@@ -96,18 +95,18 @@ async function readHead(file) {
 }
 
 /**
- * Promote a freshly uploaded temp file to its public name, or delete it.
+ * Identify a freshly uploaded temp file from its bytes, or delete it.
  *
  * multer writes to `<UPLOAD_DIR>/.incoming/`, which express.static never serves
- * (dot-directories are ignored by default), so a file is only reachable once
- * it has been sniffed and renamed here. Same filesystem, so the rename is
- * atomic — there is no window in which an unverified file is public.
+ * (dot-directories are ignored by default), so a file is only ever published
+ * after this has vouched for it — see publishUpload() in src/storage.js, which
+ * resizes images and hands the result to local disk or S3/R2.
  *
  * @param kinds  which kinds this endpoint accepts, e.g. ["image"]
- * @returns {{ filename, kind, mime }} on success
- * @throws  Error with a user-facing message, after deleting the temp file
+ * @returns {{ ext, kind, mime }} on success (the temp file is left in place)
+ * @throws  Error with status 400 and a user-facing message, after deleting the temp file
  */
-export async function finaliseUpload(tempPath, uploadDir, kinds) {
+export async function identifyUpload(tempPath, kinds) {
   try {
     const type = sniffType(await readHead(tempPath));
     if (!type || !kinds.includes(type.kind)) {
@@ -119,9 +118,7 @@ export async function finaliseUpload(tempPath, uploadDir, kinds) {
       err.status = 400;
       throw err;
     }
-    const filename = uploadFilename(type.ext);
-    await fs.promises.rename(tempPath, path.join(uploadDir, filename));
-    return { filename, kind: type.kind, mime: type.mime };
+    return type;
   } catch (err) {
     await fs.promises.unlink(tempPath).catch(() => {});
     throw err;

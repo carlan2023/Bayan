@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cssVar, isHex, shade } from "../theme";
 import { useConfig } from "../store";
 import { departmentIcon } from "./departments";
+import { srcSetFor } from "../imageSrc";
 
 /**
  * Renders the product's real photo (product.image) when present, falling back
@@ -9,7 +10,11 @@ import { departmentIcon } from "./departments";
  * image or the image fails to load. That fallback keeps the grid clean — no
  * broken-image icons — even when a seeded URL is unreachable.
  */
-export default function ProductImage({ product, ratio = 1.22 }) {
+/**
+ * @param sizes  how wide the image renders, for choosing a rendition. The
+ *               default suits the catalogue grid; the product page passes its own.
+ */
+export default function ProductImage({ product, ratio = 1.22, sizes = "(max-width: 600px) 50vw, (max-width: 1100px) 33vw, 280px" }) {
   const [failed, setFailed] = useState(false);
   const { departments, wordmark, shop_name } = useConfig();
   // The gradient is product data (its swatch); only the fallback comes from the
@@ -25,8 +30,11 @@ export default function ProductImage({ product, ratio = 1.22 }) {
     return (
       <img
         src={product.image}
+        srcSet={srcSetFor(product.image)}
+        sizes={sizes}
         alt={product.name}
         loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", aspectRatio: `1 / ${ratio}` }}
       />
