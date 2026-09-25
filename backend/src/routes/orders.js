@@ -4,6 +4,9 @@ import { Product, Order, nextOrderNumber, notify } from "../db.js";
 import { optionalAuth, requireAuth } from "../auth.js";
 import { deliveryFor, MAX_QTY_PER_LINE, LOW_STOCK_THRESHOLD } from "../config.js";
 import { alertLowStock } from "../stock-alerts.js";
+import { clampQty, stockProblem, priceOrder } from "../pricing.js";
+import { resolveVariant, variantFilter, variantInc, variantLabel } from "../variants.js";
+import { restoreStock } from "../inventory.js";
 
 const fmtUGX = (cents) => `USh ${Math.round(cents / 100).toLocaleString("en-US")}`;
 
@@ -12,18 +15,23 @@ const router = Router();
 /**
  * Create an order (Cash on Delivery).
  * Works for guests; if logged in, the order is linked to the account.
- * Prices are always re-read from the DB — the client only sends product ids/qty.
- * Stock is decremented with guarded conditional updates (compensated on failure),
- * which stays correct on standalone MongoDB instances without replica-set transactions.
+ * Prices are always re-read from the DB — the client only sends product ids,
+ * size, colour and qty. Stock is reserved per size/colour variant with guarded
+ * conditional updates (compensated on failure), which stays correct on
+ * standalone MongoDB instances without replica-set transactions.
  */
 router.post("/", optionalAuth, async (req, res, next) => {
   // Stock we have already taken. Every exit path below — sold out, validation
   // error, or a throw from Order.create — must give it back, or the units are
   // stranded: decremented from the catalogue with no order to account for them.
   const reserved = [];
+  // splice(0) empties the list as it releases, so a second call (a throw after
+  // the sold-out path already released) cannot restock the same units twice.
   const release = () =>
-    Promise.all(
-      reserved.map((r) => Product.updateOne({ _id: r.product._id }, { $inc: { stock: r.qty } }))
+    restoreStock(
+      reserved
+        .splice(0)
+        .map((l) => ({ product_id: l.product._id, size: l.variant.size, color: l.variant.color, qty: l.qty }))
     );
 
   try {
@@ -41,32 +49,35 @@ router.post("/", optionalAuth, async (req, res, next) => {
 
     const lines = [];
     for (const item of items) {
-      const qty = Math.max(1, Math.min(parseInt(item.qty, 10) || 1, MAX_QTY_PER_LINE));
+      const qty = clampQty(item.qty, MAX_QTY_PER_LINE);
       const product = await Product.findById(item.product_id);
       if (!product) return res.status(400).json({ error: `Product ${item.product_id} not found` });
-      if (product.stock < qty) {
-        return res.status(409).json({ error: `"${product.name}" has only ${product.stock} left in stock` });
-      }
-      lines.push({ product, qty, size: item.size || null, color: item.color || null });
+      const { variant, error } = resolveVariant(product, item.size || null, item.color || null);
+      if (error) return res.status(400).json({ error });
+      const problem = stockProblem(product, variant, qty);
+      if (problem) return res.status(409).json({ error: problem });
+      lines.push({ product, variant, qty });
     }
 
-    // Reserve stock: conditional decrements, rolled back if any line fails
+    // Reserve stock on each variant: a conditional decrement that only matches
+    // while that size/colour still has enough, rolled back if any line fails.
     for (const l of lines) {
       const updated = await Product.findOneAndUpdate(
-        { _id: l.product._id, stock: { $gte: l.qty } },
-        { $inc: { stock: -l.qty } },
+        variantFilter(l.product._id, l.variant, l.qty),
+        variantInc(-l.qty),
         { new: true } // read the post-decrement stock for the alerts below
       );
       if (!updated) {
         await release();
-        return res.status(409).json({ error: `"${l.product.name}" just sold out — please adjust your bag` });
+        return res.status(409).json({
+          error: `"${l.product.name}" (${variantLabel(l.variant)}) just sold out — please adjust your bag`,
+        });
       }
       reserved.push(l);
-      l.stockAfter = updated.stock;
+      l.stockAfter = updated.variants.find((v) => v.size === l.variant.size && v.color === l.variant.color)?.stock;
     }
 
-    const subtotal = lines.reduce((sum, l) => sum + l.product.price_cents * l.qty, 0);
-    const delivery = deliveryFor(subtotal);
+    const priced = priceOrder(lines, { deliveryFor });
 
     const order = await Order.create({
       number: await nextOrderNumber(),
@@ -78,17 +89,7 @@ router.post("/", optionalAuth, async (req, res, next) => {
       city: city.trim(),
       note: note?.trim() || null,
       payment_method: "cod",
-      items: lines.map((l) => ({
-        product: l.product._id,
-        name: l.product.name,
-        price_cents: l.product.price_cents,
-        qty: l.qty,
-        size: l.size,
-        color: l.color,
-      })),
-      subtotal_cents: subtotal,
-      delivery_cents: delivery,
-      total_cents: subtotal + delivery,
+      ...priced,
     });
 
     // Admin activity feed. After the response is decided — never blocks checkout.
@@ -99,13 +100,14 @@ router.post("/", optionalAuth, async (req, res, next) => {
       `${order.customer_name}, ${order.city} · ${itemCount} item${itemCount === 1 ? "" : "s"} · cash on delivery`,
       "/admin/orders"
     );
-    // Stock alerts are rate-limited to once a day per product and repeat
-    // daily until it's restocked — see src/stock-alerts.js.
+    // Stock alerts are per variant, rate-limited to once a day each and
+    // repeated daily until restocked — see src/stock-alerts.js.
     for (const l of lines) {
-      if (l.stockAfter <= LOW_STOCK_THRESHOLD) {
-        alertLowStock({ _id: l.product._id, name: l.product.name, stock: l.stockAfter }).catch((e) =>
-          console.error("Low-stock alert failed:", e.message)
-        );
+      if (l.stockAfter != null && l.stockAfter <= LOW_STOCK_THRESHOLD) {
+        alertLowStock(
+          { _id: l.product._id, name: l.product.name },
+          { size: l.variant.size, color: l.variant.color, stock: l.stockAfter }
+        ).catch((e) => console.error("Low-stock alert failed:", e.message));
       }
     }
 

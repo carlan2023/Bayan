@@ -169,7 +169,7 @@ that per service; it's ops, not code.
 
 ---
 
-## M7 — Per-variant inventory
+## M7 — Per-variant inventory ✅ (bar the live rehearsal)
 
 **Do this before onboarding anyone.** `stock` is a single integer on the product
 (`db.js:50`) while `sizes` (`:47`) and `colors` (`:46`) are independent arrays.
@@ -178,18 +178,21 @@ inventory question in clothing, and the first thing a real shop will notice is
 missing. Migrating it later means migrating every tenant database that already has
 live order history, with money on the line.
 
-- [ ] Replace the flat `stock` with a `variants: [{ size, color, sku, stock, price_cents? }]`
+- [x] Replace the flat `stock` with a `variants: [{ size, color, sku, stock, price_cents? }]`
       subdocument; keep a derived total for the low-stock panel at `admin.js:156`.
-- [ ] Rework the reservation loop in `routes/orders.js:51-61` to guard on the
+- [x] Rework the reservation loop in `routes/orders.js:51-61` to guard on the
       variant rather than the product. The existing `release()` compensator
       (`:21-24`) and the cancel-restock path (`admin.js:229-233`) both move with it.
-- [ ] `Product.jsx` disables unavailable size/colour pairs instead of a single
+- [x] `Product.jsx` disables unavailable size/colour pairs instead of a single
       product-level "Out of stock"; `store.jsx` clamps per variant (`:191`, `:232`, `:250`).
-- [ ] Variant editor in `admin/Products.jsx` (already the largest file at 467 lines
+- [x] Variant editor in `admin/Products.jsx` (already the largest file at 467 lines
       — worth splitting while you're in there).
-- [ ] Migration script, plus a rehearsal against a copy of the live database.
-- [ ] CI: the existing stock-accounting assertions re-pointed at variants, and a
+- [x] Migration script (`npm run migrate:variants`, idempotent, runs on boot).
+- [ ] Rehearsal against a copy of the live database. Not done: this session has no access to the production data. Run `MONGODB_URI=<copy> npm run migrate:variants` against a `mongodump` restore before the deploy that ships it.
+- [x] CI: the existing stock-accounting assertions re-pointed at variants, and a
       new case for a partially-available line.
+
+The admin form is now `admin/Products.jsx` (list), `admin/ProductForm.jsx` and `admin/VariantEditor.jsx`.
 
 ---
 
@@ -216,36 +219,38 @@ client.
 
 ---
 
-## M9 — Security and correctness (carries `SPRINT.md` M5)
+## M9 — Security and correctness (carries `SPRINT.md` M5) ✅
 
 M5 was acceptable while this was your own shop. It isn't once someone else's
 customers' addresses and phone numbers are in the database.
 
-- [ ] **No rate limiting on `/api/auth/login`** (`routes/auth.js:39`) — unlimited
+- [x] **No rate limiting on `/api/auth/login`** (`routes/auth.js:39`) — unlimited
       brute force, and `bcrypt.compareSync` at `:44` blocks the single-threaded
       event loop, so it's also a cheap way to take a shop offline. Add
       `express-rate-limit`, switch to async `bcrypt.compare` (also at `:30`).
-- [ ] **`cors()` is fully open** (`server.js:17`) though the SPA is served
+- [x] **`cors()` is fully open** (`server.js:17`) though the SPA is served
       same-origin in production (`:40-48`). Restrict it; add `helmet`.
-- [ ] **Upload extension is attacker-controlled** — `admin.js:21` takes it from
+- [x] **Upload extension is attacker-controlled** — `admin.js:21` takes it from
       `file.originalname` and the `fileFilter` (`:26`) only checks the
       client-supplied mimetype. `x.html` sent as `image/png` is written and served
       as HTML from `/uploads` (`server.js:31`) — stored XSS on your own origin.
       Admin-only, so low severity, but allowlist `.jpg/.jpeg/.png/.webp` and set
       `X-Content-Type-Options: nosniff`.
-- [ ] **`multer@1.4.5-lts.1`** is EOL with known DoS advisories → 2.x.
-- [ ] **No password reset anywhere.** `routes/auth.js` is register/login/me only.
+- [x] **`multer@1.4.5-lts.1`** is EOL with known DoS advisories → 2.x.
+- [x] **No password reset anywhere.** `routes/auth.js` is register/login/me only.
       A locked-out shop owner has no recovery path and becomes a support call you
       can't resolve. Needs a token-based reset flow and an email sender —
       pair it with M8's notification work.
-- [ ] **No second-admin flow.** `is_admin` (`db.js:30`) can only be set by the
+- [x] **No second-admin flow.** `is_admin` (`db.js:30`) can only be set by the
       bootstrap in `connectDB` (`:141-178`) or by hand in the database. A shop with
       two staff can't be served. Add admin invites.
-- [ ] **No tests on the money math.** CI is a curl script with `sleep 3`. The
+- [x] **No tests on the money math.** CI is a curl script with `sleep 3`. The
       re-pricing and delivery logic in `routes/orders.js:63-64` deserves real unit
       tests before N shops depend on it — a regression there overcharges real
       customers in several stores at once.
-- [ ] Consider audit logging on admin order-status changes and price edits.
+- [x] Consider audit logging on admin order-status changes and price edits.
+
+UI: `/forgot-password`, `/reset-password`, `/accept-invite`, `/admin/team` and `/admin/audit`. Audited actions: order status, product create, price edits, invites and their revocation, joins, demotions, password resets.
 
 ---
 

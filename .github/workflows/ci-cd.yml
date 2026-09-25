@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   backend-test:
-    name: Backend — syntax, seed & API smoke test
+    name: Backend — syntax, tests, seed & API smoke test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,16 +46,58 @@ jobs:
         run: |
           for f in $(find src -name '*.js'); do node --check "$f"; done
 
+      - name: Unit & route tests
+        # Route tests use the mongo service via MONGO_TEST_URI (each test file
+        # creates and drops its own database), so nothing is downloaded in CI.
+        run: npm test
+        env:
+          MONGO_TEST_URI: mongodb://localhost:27017
+
       - name: Seed database
         run: node src/seed.js
+
+      - name: Variants migration is a no-op on a fresh seed
+        run: |
+          node src/migrate-variants.js | tee /tmp/migrate.log
+          grep -q "Migrated 0 product" /tmp/migrate.log || { echo "::error::migration touched seeded products"; exit 1; }
 
       - name: Boot server & smoke-test API
         run: |
           node src/server.js &
           SERVER_PID=$!
-          sleep 3
 
-          fail() { echo "::error::$1"; kill $SERVER_PID; exit 1; }
+          fail() { echo "::error::$1"; kill $SERVER_PID 2>/dev/null; exit 1; }
+
+          # Wait for readiness instead of a fixed sleep: poll /api/health for
+          # up to 30s, and fail fast if the process has already died.
+          for i in $(seq 1 60); do
+            curl -sf localhost:4000/api/health > /dev/null && break
+            kill -0 $SERVER_PID 2>/dev/null || fail "server exited during startup"
+            [ "$i" = 60 ] && fail "server not ready after 30s"
+            sleep 0.5
+          done
+
+          # Variant helpers. pick_variant prints one in-stock (>= 3) variant as
+          # JSON {id,size,color,stock}; sizes like "One size" contain spaces, so
+          # JSON is passed around rather than word-split shell values.
+          pick_variant() {
+            curl -sf "localhost:4000/api/products?limit=100" | python3 -c '
+          import json, sys
+          for p in json.load(sys.stdin)["products"]:
+              for v in p["variants"]:
+                  if v["stock"] >= 3:
+                      print(json.dumps({"id": p["id"], "size": v["size"], "color": v["color"], "stock": v["stock"]}))
+                      sys.exit()
+          sys.exit(1)'
+          }
+          field() { python3 -c 'import json,sys; print(json.loads(sys.argv[1])[sys.argv[2]])' "$1" "$2"; }
+          line() { python3 -c 'import json,sys; v=json.loads(sys.argv[1]); print(json.dumps({"product_id": v["id"], "size": v["size"], "color": v["color"], "qty": int(sys.argv[2])}))' "$1" "$2"; }
+          variant_stock() {
+            curl -sf "localhost:4000/api/products?ids=$1" | python3 -c '
+          import json, sys
+          p = json.load(sys.stdin)["products"][0]
+          print([v["stock"] for v in p["variants"] if v["size"] == sys.argv[1] and v["color"] == sys.argv[2]][0], p["stock"])' "$2" "$3"
+          }
 
           # health
           curl -sf localhost:4000/api/health | grep -q '"ok":true' || fail "health check failed"
@@ -95,12 +137,11 @@ jobs:
           curl -sf localhost:4000/api/auth/me -H "Authorization: Bearer $TOKEN" \
             | grep -q ci@test.com || fail "auth/me failed"
 
-          # guest COD order (product id fetched from the catalog)
-          PID=$(curl -sf "localhost:4000/api/products?limit=1" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          # guest COD order on a real size/colour variant
+          V=$(pick_variant) || fail "no in-stock variant after seed"
           ORDER=$(curl -sf -X POST localhost:4000/api/orders \
             -H 'Content-Type: application/json' \
-            -d "{\"customer_name\":\"CI Guest\",\"phone\":\"0700000000\",\"address\":\"1 Test St\",\"city\":\"Nairobi\",\"items\":[{\"product_id\":\"$PID\",\"qty\":1,\"size\":\"M\",\"color\":\"Forest\"}]}")
+            -d "{\"customer_name\":\"CI Guest\",\"phone\":\"0700000000\",\"address\":\"1 Test St\",\"city\":\"Nairobi\",\"items\":[$(line "$V" 1)]}")
           echo "$ORDER" | grep -q '"payment_method":"cod"' || fail "order creation failed"
           OID=$(echo "$ORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['id'])")
 
@@ -136,38 +177,48 @@ jobs:
           curl -sf "localhost:4000/api/admin/orders?search=$(echo "$ORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['number'])")" \
             -H "Authorization: Bearer $ADMIN" | grep -q '"customer_name"' || fail "admin order search by number failed"
 
-          # ---- stock accounting: units must never be stranded ----
-          stock_of() {
-            curl -sf "localhost:4000/api/products?ids=$1" \
-              | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['stock'])"
-          }
-          SPID=$(curl -sf "localhost:4000/api/products?limit=1" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['products'][0]['id'])")
+          # ---- stock accounting per variant: units must never be stranded ----
+          # (test/orders.routes.test.js covers this in depth; this re-checks it
+          # on the seeded catalogue the deploy will actually boot with)
+          V=$(pick_variant) || fail "no in-stock variant for stock accounting"
+          SPID=$(field "$V" id); SSIZE=$(field "$V" size); SCOLOR=$(field "$V" color); SSTOCK=$(field "$V" stock)
 
-          BEFORE=$(stock_of "$SPID")
+          read VBEFORE TBEFORE <<< "$(variant_stock "$SPID" "$SSIZE" "$SCOLOR")"
           SORDER=$(curl -sf -X POST localhost:4000/api/orders \
             -H 'Content-Type: application/json' \
-            -d "{\"customer_name\":\"CI Stock\",\"phone\":\"0700000001\",\"address\":\"2 Test St\",\"city\":\"Kampala\",\"items\":[{\"product_id\":\"$SPID\",\"qty\":2,\"size\":\"M\",\"color\":\"Forest\"}]}") \
+            -d "{\"customer_name\":\"CI Stock\",\"phone\":\"0700000001\",\"address\":\"2 Test St\",\"city\":\"Kampala\",\"items\":[$(line "$V" 2)]}") \
             || fail "stock-accounting order failed"
-          AFTER=$(stock_of "$SPID")
-          [ "$AFTER" = "$((BEFORE - 2))" ] || fail "stock should drop by 2 (was $BEFORE, now $AFTER)"
+          read VAFTER TAFTER <<< "$(variant_stock "$SPID" "$SSIZE" "$SCOLOR")"
+          [ "$VAFTER" = "$((VBEFORE - 2))" ] || fail "variant stock should drop by 2 (was $VBEFORE, now $VAFTER)"
+          [ "$TAFTER" = "$((TBEFORE - 2))" ] || fail "derived total should drop by 2 (was $TBEFORE, now $TAFTER)"
 
-          # Cancelling restocks exactly once
+          # Cancelling restocks the same variant exactly once
           SOID=$(echo "$SORDER" | python3 -c "import json,sys; print(json.load(sys.stdin)['order']['id'])")
           curl -sf -X PATCH "localhost:4000/api/admin/orders/$SOID" \
             -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
             -d '{"status":"cancelled"}' > /dev/null || fail "cancel failed"
-          RESTOCKED=$(stock_of "$SPID")
-          [ "$RESTOCKED" = "$BEFORE" ] || fail "cancel should restore stock to $BEFORE, got $RESTOCKED"
+          read VRESTOCK TRESTOCK <<< "$(variant_stock "$SPID" "$SSIZE" "$SCOLOR")"
+          [ "$VRESTOCK" = "$VBEFORE" ] || fail "cancel should restore the variant to $VBEFORE, got $VRESTOCK"
+          [ "$TRESTOCK" = "$TBEFORE" ] || fail "cancel should restore the total to $TBEFORE, got $TRESTOCK"
 
           # A rejected multi-line order must leave stock exactly as it found it:
           # line 1 is valid, line 2 points at a product that does not exist.
           REJECTED=$(curl -s -o /dev/null -w "%{http_code}" -X POST localhost:4000/api/orders \
             -H 'Content-Type: application/json' \
-            -d "{\"customer_name\":\"CI Reject\",\"phone\":\"0700000002\",\"address\":\"3 Test St\",\"city\":\"Kampala\",\"items\":[{\"product_id\":\"$SPID\",\"qty\":1,\"size\":\"M\",\"color\":\"Forest\"},{\"product_id\":\"000000000000000000000000\",\"qty\":1}]}")
+            -d "{\"customer_name\":\"CI Reject\",\"phone\":\"0700000002\",\"address\":\"3 Test St\",\"city\":\"Kampala\",\"items\":[$(line "$V" 1),{\"product_id\":\"000000000000000000000000\",\"qty\":1}]}")
           [ "$REJECTED" = "400" ] || fail "order with a missing product should be rejected with 400, got $REJECTED"
-          UNCHANGED=$(stock_of "$SPID")
-          [ "$UNCHANGED" = "$BEFORE" ] || fail "rejected order leaked stock ($BEFORE -> $UNCHANGED)"
+          read VSAME TSAME <<< "$(variant_stock "$SPID" "$SSIZE" "$SCOLOR")"
+          [ "$VSAME" = "$VBEFORE" ] || fail "rejected order leaked variant stock ($VBEFORE -> $VSAME)"
+
+          # A partially-available line (one more than the variant holds) is a
+          # 409 naming the real count. Seeded variant stock is < 20, the cap.
+          OVER=$(curl -s -X POST localhost:4000/api/orders \
+            -H 'Content-Type: application/json' \
+            -d "{\"customer_name\":\"CI Over\",\"phone\":\"0700000003\",\"address\":\"4 Test St\",\"city\":\"Kampala\",\"items\":[$(line "$V" $((SSTOCK + 1)))]}")
+          echo "$OVER" | grep -q "left in stock" || fail "over-stock line was not rejected with the variant's count: $OVER"
+
+          # Security headers
+          curl -sI localhost:4000/api/health | grep -qi "content-security-policy" || fail "CSP header missing"
 
           kill $SERVER_PID
           echo "All API smoke tests passed."

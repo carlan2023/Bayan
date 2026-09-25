@@ -5,6 +5,8 @@
  * directly — this is the code that guards catalogue integrity and pricing.
  */
 
+import { validateVariants, normaliseVariants, variantsFromFlatStock } from "./variants.js";
+
 export const slugify = (s) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -36,8 +38,25 @@ export function validateProduct(body) {
     errors.push("sizes must be a non-empty array of strings");
   }
 
-  const stock = Number(body.stock);
-  if (!Number.isInteger(stock) || stock < 0) errors.push("stock must be a non-negative integer");
+  // Stock lives on variants. A bare `stock` is still accepted from older API
+  // callers and spread across the size/colour grid (see variantsFromFlatStock),
+  // but when variants are sent they are the only source of truth.
+  if (body.variants !== undefined) {
+    if (errors.length === 0) {
+      errors.push(
+        ...validateVariants(
+          body.variants,
+          body.sizes.map((s) => String(s).trim()),
+          body.colors.map((c) => String(c.name).trim())
+        )
+      );
+    }
+  } else {
+    const stock = Number(body.stock);
+    if (!Number.isInteger(stock) || stock < 0) {
+      errors.push("variants are required (or a non-negative integer stock to spread across them)");
+    }
+  }
 
   if (body.compare_at_cents != null && body.compare_at_cents !== "") {
     const cmp = Number(body.compare_at_cents);
@@ -48,7 +67,19 @@ export function validateProduct(body) {
   return errors;
 }
 
-/** Normalised, trimmed fields ready to assign onto a Product document. */
+/**
+ * Normalised variants for a validated payload.
+ * @param previous  the stored variants when editing, to carry alert clocks over
+ */
+export function variantFields(b, { slug, previous = [], threshold } = {}) {
+  const sizes = b.sizes.map((s) => String(s).trim());
+  const colors = b.colors.map((c) => ({ name: String(c.name).trim() }));
+  const raw =
+    b.variants !== undefined ? b.variants : variantsFromFlatStock({ slug, stock: b.stock, sizes, colors });
+  return normaliseVariants(raw, { slug, previous, threshold });
+}
+
+/** Normalised, trimmed fields ready to assign onto a Product document (variants excluded). */
 export const productFields = (b) => ({
   name: b.name.trim(),
   description: b.description.trim(),
@@ -67,5 +98,4 @@ export const productFields = (b) => ({
   sizes: b.sizes.map((s) => String(s).trim()),
   fabric: b.fabric?.trim() || null,
   featured: !!b.featured,
-  stock: Number(b.stock),
 });
